@@ -1,12 +1,22 @@
 import { formatJobMessage } from "../job.formatter.js";
+import { ArbeitnowProvider } from "../providers/arbeitnow.provider.js";
 import { JobicyProvider } from "../providers/jobicy.provider.js";
+import { RemoteokProvider } from "../providers/remoteok.provider.js";
 import { RemotiveProvider } from "../providers/remotive.provider.js";
+import type { JobProvider } from "../providers/provider.interface.js";
 
 const providerArg = process.argv.find((arg) => arg.startsWith("--provider="));
 const providerName = providerArg?.split("=")[1] ?? "jobicy";
 
+const providersByName: Record<string, () => JobProvider> = {
+  jobicy: () => new JobicyProvider(),
+  remotive: () => new RemotiveProvider(),
+  remoteok: () => new RemoteokProvider(),
+  arbeitnow: () => new ArbeitnowProvider()
+};
+
 if (process.argv.includes("--dry-run")) {
-  const provider = providerName === "remotive" ? new RemotiveProvider() : new JobicyProvider();
+  const provider = (providersByName[providerName] ?? providersByName.jobicy)();
   const jobs = await provider.fetchJobs();
   console.log({
     provider: provider.name,

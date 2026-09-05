@@ -6,7 +6,9 @@ import { env } from "../config/env.js";
 import { formatJobMessage } from "./job.formatter.js";
 import { JobRepository } from "./job.repository.js";
 import type { NormalizedJob, PersistedJob } from "./job.types.js";
+import { ArbeitnowProvider } from "./providers/arbeitnow.provider.js";
 import { JobicyProvider } from "./providers/jobicy.provider.js";
+import { RemoteokProvider } from "./providers/remoteok.provider.js";
 import { RemotiveProvider } from "./providers/remotive.provider.js";
 import type { JobProvider } from "./providers/provider.interface.js";
 
@@ -104,5 +106,10 @@ export class JobService {
 export const jobService = new JobService();
 
 function createDefaultProviders(): JobProvider[] {
-  return [new JobicyProvider(), ...(env.REMOTIVE_JOBS_ENABLED ? [new RemotiveProvider()] : [])];
+  return [
+    new JobicyProvider(),
+    ...(env.REMOTIVE_JOBS_ENABLED ? [new RemotiveProvider()] : []),
+    ...(env.REMOTEOK_JOBS_ENABLED ? [new RemoteokProvider()] : []),
+    ...(env.ARBEITNOW_JOBS_ENABLED ? [new ArbeitnowProvider()] : [])
+  ];
 }

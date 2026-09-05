@@ -185,7 +185,7 @@ O worker marca envios como `sent`, reagenda falhas enquanto houver tentativas di
 
 ## Vagas
 
-A Fase 4 comeca com Jobicy e Remotive. Jobicy fica habilitado no fluxo principal; Remotive foi implementado, mas fica desabilitado por padrao porque a propria API recomenda poucas chamadas por dia.
+A Fase 4 comeca com Jobicy e Remotive, depois ganhou RemoteOK e Arbeitnow. Jobicy fica habilitado no fluxo principal; os demais foram implementados, mas ficam desabilitados por padrao ate confirmar limites e volume de cada API.
 
 ```text
 GET https://jobicy.com/api/v2/remote-jobs
@@ -197,13 +197,31 @@ Remotive:
 GET https://remotive.com/api/remote-jobs
 ```
 
-Em desenvolvimento local, `.env.local` deixa `JOBS_POLL_ENABLED=false` para evitar postar dezenas de vagas acidentalmente nos grupos reais. Em producao, habilite:
+RemoteOK (o primeiro item do array e um aviso legal, nao uma vaga; a API pede para linkar de volta ao RemoteOK e nao usar a logo sem permissao):
+
+```text
+GET https://remoteok.com/api
+```
+
+Arbeitnow (paginado em `data`, filtramos por `remote=true`):
+
+```text
+GET https://arbeitnow.com/api/job-board-api
+```
+
+RemoteOK e Arbeitnow nao tem um filtro de categoria "tech" na propria API, entao o provider filtra localmente por tecnologias conhecidas e por palavras-chave de cargo (developer, engineer, devops, qa, etc.) antes de normalizar.
+
+Em desenvolvimento local, `.env.local` deixa `JOBS_POLL_ENABLED=false` para evitar postar dezenas de vagas acidentalmente nos grupos reais. Em producao, habilite os providers um de cada vez:
 
 ```env
 JOBS_POLL_ENABLED=true
 JOBICY_JOBS_COUNT=50
 REMOTIVE_JOBS_ENABLED=false
 REMOTIVE_JOBS_COUNT=20
+REMOTEOK_JOBS_ENABLED=false
+REMOTEOK_JOBS_COUNT=20
+ARBEITNOW_JOBS_ENABLED=false
+ARBEITNOW_JOBS_COUNT=20
 JOBS_POLL_INTERVAL_MINUTES=5
 ```
 
@@ -213,10 +231,12 @@ Validar Jobicy e formatacao sem salvar/enfileirar:
 npm run jobs:poll -- --dry-run
 ```
 
-Validar Remotive sem salvar/enfileirar:
+Validar os demais providers sem salvar/enfileirar:
 
 ```bash
 npm run jobs:poll -- --dry-run --provider=remotive
+npm run jobs:poll -- --dry-run --provider=remoteok
+npm run jobs:poll -- --dry-run --provider=arbeitnow
 ```
 
 Rodar polling real manualmente:
