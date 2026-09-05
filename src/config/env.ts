@@ -54,6 +54,7 @@ const envSchema = z.object({
   MESSAGE_INTERVAL_SECONDS: z.coerce.number().int().positive().default(30),
   MESSAGE_MAX_RETRIES: z.coerce.number().int().nonnegative().default(3),
   JOBS_POLL_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(true),
+  JOBICY_JOBS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(true),
   JOBICY_JOBS_COUNT: z.coerce.number().int().min(1).max(200).default(50),
   REMOTIVE_JOBS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
   REMOTIVE_JOBS_COUNT: z.coerce.number().int().min(1).max(100).default(20),

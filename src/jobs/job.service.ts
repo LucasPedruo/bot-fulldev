@@ -108,7 +108,7 @@ export const jobService = new JobService();
 
 function createDefaultProviders(): JobProvider[] {
   return [
-    new JobicyProvider(),
+    ...(env.JOBICY_JOBS_ENABLED ? [new JobicyProvider()] : []),
     ...(env.REMOTIVE_JOBS_ENABLED ? [new RemotiveProvider()] : []),
     ...(env.REMOTEOK_JOBS_ENABLED ? [new RemoteokProvider()] : []),
     ...(env.ARBEITNOW_JOBS_ENABLED ? [new ArbeitnowProvider()] : []),
