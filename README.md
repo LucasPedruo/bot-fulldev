@@ -185,7 +185,11 @@ O worker marca envios como `sent`, reagenda falhas enquanto houver tentativas di
 
 ## Vagas
 
-A Fase 4 comeca com Jobicy e Remotive, depois ganhou RemoteOK e Arbeitnow. Jobicy fica habilitado no fluxo principal; os demais foram implementados, mas ficam desabilitados por padrao ate confirmar limites e volume de cada API.
+A Fase 4 comeca com Jobicy e Remotive, depois ganhou RemoteOK, Arbeitnow e Himalayas. Jobicy fica habilitado no fluxo principal; os demais foram implementados, mas ficam desabilitados por padrao ate confirmar limites e volume de cada API.
+
+Jobicy, Remotive, RemoteOK e Arbeitnow sao boards internacionais (Arbeitnow e focado em vagas na Alemanha/Europa). Nenhum tem foco no Brasil. LinkedIn foi avaliado e descartado: nao existe API publica de vagas (o acesso oficial exige status de parceiro Talent Solutions, restrito a empresas) e fazer scraping da busca de vagas viola os Termos de Uso do LinkedIn, alem de ser bloqueado rapidamente na pratica (rate limit, CAPTCHA, banimento de conta/IP).
+
+Himalayas (`himalayas.app`) cobre o foco em vagas brasileiras: a API oficial e publica, sem cadastro, e o endpoint de busca aceita `country=Brazil` (retorna vagas restritas ao Brasil e vagas mundiais sem restricao de pais) e `seniority=Entry-level,Mid-level` (equivalente a estagio/junior + pleno, excluindo senior/lead/gerencia). Os termos de uso pedem apenas atribuicao visivel ao himalayas.app, que ja e satisfeita porque a propria URL da vaga aponta para o himalayas.app.
 
 ```text
 GET https://jobicy.com/api/v2/remote-jobs
@@ -209,7 +213,13 @@ Arbeitnow (paginado em `data`, filtramos por `remote=true`):
 GET https://arbeitnow.com/api/job-board-api
 ```
 
-RemoteOK e Arbeitnow nao tem um filtro de categoria "tech" na propria API, entao o provider filtra localmente por tecnologias conhecidas e por palavras-chave de cargo (developer, engineer, devops, qa, etc.) antes de normalizar.
+Himalayas (paginado por `page`, ate 5 paginas por rodada de poll):
+
+```text
+GET https://himalayas.app/jobs/api/search?country=Brazil&seniority=Entry-level,Mid-level
+```
+
+Nenhuma dessas 4 APIs expoe um filtro de categoria "tech" confiavel (RemoteOK e Arbeitnow nao tem categoria nenhuma; o `parentCategories` do Himalayas fica vazio mesmo em vagas claramente tecnicas), entao o provider filtra localmente pelo **titulo** da vaga com tecnologias conhecidas e palavras-chave de cargo (developer/desenvolvedor, engineer/engenheiro, devops, qa, etc. — o Himalayas usa palavras-chave em portugues tambem). Tags e descricao nao entram nessa decisao porque sao texto livre e geram falsos positivos (ex.: tag "react" numa vaga de gerente de loja no RemoteOK, "engineering" mencionado na descricao de uma vaga de suporte no Arbeitnow).
 
 Em desenvolvimento local, `.env.local` deixa `JOBS_POLL_ENABLED=false` para evitar postar dezenas de vagas acidentalmente nos grupos reais. Em producao, habilite os providers um de cada vez:
 
@@ -222,6 +232,8 @@ REMOTEOK_JOBS_ENABLED=false
 REMOTEOK_JOBS_COUNT=20
 ARBEITNOW_JOBS_ENABLED=false
 ARBEITNOW_JOBS_COUNT=20
+HIMALAYAS_JOBS_ENABLED=false
+HIMALAYAS_JOBS_COUNT=20
 JOBS_POLL_INTERVAL_MINUTES=5
 ```
 
@@ -237,6 +249,7 @@ Validar os demais providers sem salvar/enfileirar:
 npm run jobs:poll -- --dry-run --provider=remotive
 npm run jobs:poll -- --dry-run --provider=remoteok
 npm run jobs:poll -- --dry-run --provider=arbeitnow
+npm run jobs:poll -- --dry-run --provider=himalayas
 ```
 
 Rodar polling real manualmente:

@@ -44,7 +44,7 @@ export function createJobFingerprint(input: { company: string; title: string; ur
 export function inferLevel(value: string): JobLevel | undefined {
   const text = normalizeForMatch(value);
 
-  if (/\bintern\b|estagio|estagiario|trainee/.test(text)) {
+  if (/\bintern\b|estagi|trainee/.test(text)) {
     return "intern";
   }
 
@@ -66,7 +66,7 @@ export function inferLevel(value: string): JobLevel | undefined {
 export function inferCategory(value: string): JobCategory {
   const text = normalizeForMatch(value);
 
-  if (/\bqa\b|quality assurance|quality|tester|test automation/.test(text)) {
+  if (/\bqa\b|quality assurance|quality|tester|testador|test automation|qualidade de software/.test(text)) {
     return "qa";
   }
 
@@ -78,7 +78,7 @@ export function inferCategory(value: string): JobCategory {
     return "mobile";
   }
 
-  if (/\bdata\b|analytics|machine learning|ml\b|ai\b|artificial intelligence|scientist/.test(text)) {
+  if (/\bdata\b|dados|analytics|machine learning|ml\b|ai\b|artificial intelligence|inteligencia artificial|scientist|cientista/.test(text)) {
     return "data";
   }
 
@@ -110,7 +110,7 @@ function normalizeFingerprintPart(value: string): string {
   return normalizeForMatch(value).replace(/\s+/g, " ").trim();
 }
 
-function normalizeForMatch(value: string): string {
+export function normalizeForMatch(value: string): string {
   return value
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")

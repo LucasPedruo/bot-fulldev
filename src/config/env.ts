@@ -61,6 +61,8 @@ const envSchema = z.object({
   REMOTEOK_JOBS_COUNT: z.coerce.number().int().min(1).max(100).default(20),
   ARBEITNOW_JOBS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
   ARBEITNOW_JOBS_COUNT: z.coerce.number().int().min(1).max(100).default(20),
+  HIMALAYAS_JOBS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  HIMALAYAS_JOBS_COUNT: z.coerce.number().int().min(1).max(100).default(20),
   JOBS_POLL_INTERVAL_MINUTES: z.coerce.number().int().positive().default(5),
   EVENTS_POLL_INTERVAL_MINUTES: z.coerce.number().int().positive().default(15),
   NETWORKING_MORNING_TIME: timeSchema.default("08:00"),

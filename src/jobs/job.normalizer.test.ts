@@ -28,12 +28,14 @@ void test("inferLevel maps common seniority labels", () => {
   assert.equal(inferLevel("Jr Front-end Developer"), "junior");
   assert.equal(inferLevel("Pessoa Desenvolvedora Pleno"), "mid");
   assert.equal(inferLevel("Estagio em QA"), "intern");
+  assert.equal(inferLevel("Pessoa Estagiária de Governança de SI"), "intern");
 });
 
 void test("inferCategory maps technology text to category", () => {
   assert.equal(inferCategory("React TypeScript UI Engineer"), "frontend");
   assert.equal(inferCategory("Node.js API Backend Engineer"), "backend");
   assert.equal(inferCategory("Flutter Mobile Developer"), "mobile");
+  assert.equal(inferCategory("Cientista de Dados Pleno"), "data");
 });
 
 void test("extractTechnologies returns unique known technologies", () => {

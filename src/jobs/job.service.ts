@@ -7,6 +7,7 @@ import { formatJobMessage } from "./job.formatter.js";
 import { JobRepository } from "./job.repository.js";
 import type { NormalizedJob, PersistedJob } from "./job.types.js";
 import { ArbeitnowProvider } from "./providers/arbeitnow.provider.js";
+import { HimalayasProvider } from "./providers/himalayas.provider.js";
 import { JobicyProvider } from "./providers/jobicy.provider.js";
 import { RemoteokProvider } from "./providers/remoteok.provider.js";
 import { RemotiveProvider } from "./providers/remotive.provider.js";
@@ -110,6 +111,7 @@ function createDefaultProviders(): JobProvider[] {
     new JobicyProvider(),
     ...(env.REMOTIVE_JOBS_ENABLED ? [new RemotiveProvider()] : []),
     ...(env.REMOTEOK_JOBS_ENABLED ? [new RemoteokProvider()] : []),
-    ...(env.ARBEITNOW_JOBS_ENABLED ? [new ArbeitnowProvider()] : [])
+    ...(env.ARBEITNOW_JOBS_ENABLED ? [new ArbeitnowProvider()] : []),
+    ...(env.HIMALAYAS_JOBS_ENABLED ? [new HimalayasProvider()] : [])
   ];
 }
