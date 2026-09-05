@@ -65,6 +65,12 @@ const envSchema = z.object({
   ARBEITNOW_JOBS_COUNT: z.coerce.number().int().min(1).max(100).default(20),
   HIMALAYAS_JOBS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
   HIMALAYAS_JOBS_COUNT: z.coerce.number().int().min(1).max(100).default(20),
+  GREENHOUSE_JOBS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  GREENHOUSE_JOBS_COUNT: z.coerce.number().int().min(1).max(100).default(20),
+  GREENHOUSE_BOARD_SLUGS: z
+    .string()
+    .min(1)
+    .default("nubank,stone,quintoandar,gympass,ebanx,wildlifestudios,vtex,rdstation,inter,c6bank"),
   JOBS_POLL_INTERVAL_MINUTES: z.coerce.number().int().positive().default(5),
   EVENTS_POLL_INTERVAL_MINUTES: z.coerce.number().int().positive().default(15),
   NETWORKING_MORNING_TIME: timeSchema.default("08:00"),

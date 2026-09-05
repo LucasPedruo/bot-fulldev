@@ -36,6 +36,7 @@ void test("inferCategory maps technology text to category", () => {
   assert.equal(inferCategory("Node.js API Backend Engineer"), "backend");
   assert.equal(inferCategory("Flutter Mobile Developer"), "mobile");
   assert.equal(inferCategory("Cientista de Dados Pleno"), "data");
+  assert.equal(inferCategory("Analista de Qualidade e Automação de Software Pleno"), "qa");
 });
 
 void test("extractTechnologies returns unique known technologies", () => {

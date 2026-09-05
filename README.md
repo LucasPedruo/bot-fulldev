@@ -219,7 +219,17 @@ Himalayas (paginado por `page`, ate 5 paginas por rodada de poll):
 GET https://himalayas.app/jobs/api/search?country=Brazil&seniority=Entry-level,Mid-level
 ```
 
-Nenhuma dessas 4 APIs expoe um filtro de categoria "tech" confiavel (RemoteOK e Arbeitnow nao tem categoria nenhuma; o `parentCategories` do Himalayas fica vazio mesmo em vagas claramente tecnicas), entao o provider filtra localmente pelo **titulo** da vaga com tecnologias conhecidas e palavras-chave de cargo (developer/desenvolvedor, engineer/engenheiro, devops, qa, etc. — o Himalayas usa palavras-chave em portugues tambem). Tags e descricao nao entram nessa decisao porque sao texto livre e geram falsos positivos (ex.: tag "react" numa vaga de gerente de loja no RemoteOK, "engineering" mencionado na descricao de uma vaga de suporte no Arbeitnow).
+Greenhouse (um board publico por empresa, sem busca entre empresas — `GREENHOUSE_BOARD_SLUGS` lista os boards, um por vez):
+
+```text
+GET https://boards-api.greenhouse.io/v1/boards/{slug}/jobs
+```
+
+Cada slug em `GREENHOUSE_BOARD_SLUGS` foi confirmado manualmente como o board publico real de uma empresa brasileira de tech (Nubank, Stone, QuintoAndar, Gympass, EBANX, Wildlife Studios, VTEX, RD Station, Banco Inter, C6 Bank). Gupy e Glassdoor foram avaliados e descartados: a API publica da Gupy e so para a propria empresa gerenciar suas vagas (token da empresa, sem busca agregada — mesmo problema do LinkedIn), e a API publica do Glassdoor foi descontinuada em 2021 (hoje e so parceria paga). Itau, iFood e Mercado Livre nao usam Greenhouse nem Lever, entao nao aparecem aqui — precisariam de investigacao individual do ATS que cada uma usa.
+
+Sem um campo de nivel estruturado (diferente do `seniority` do Himalayas), o Greenhouse so inclui uma vaga quando o **titulo** menciona estagio/junior/pleno explicitamente — vagas ambiguas (sem nenhuma palavra de nivel no titulo) ficam de fora por seguranca, mesmo que pudessem ser junior/pleno na pratica. Diferente dos outros 4 providers, o Greenhouse nao filtra por remoto: cada board e de uma empresa brasileira especifica, entao vagas hibridas/presenciais tambem entram (o campo `remote` reflete o texto da localizacao; a mensagem so mostra "Remoto" quando for de fato remoto).
+
+Nenhuma dessas 5 APIs expoe um filtro de categoria "tech" confiavel (RemoteOK, Arbeitnow e Greenhouse nao tem categoria nenhuma; o `parentCategories` do Himalayas fica vazio mesmo em vagas claramente tecnicas), entao o provider filtra localmente pelo **titulo** da vaga com tecnologias conhecidas e palavras-chave de cargo (developer/desenvolvedor, engineer/engenheiro, devops, qa, etc. — Himalayas e Greenhouse usam palavras-chave em portugues tambem). Tags e descricao nao entram nessa decisao porque sao texto livre e geram falsos positivos (ex.: tag "react" numa vaga de gerente de loja no RemoteOK, "engineering" mencionado na descricao de uma vaga de suporte no Arbeitnow).
 
 Sem cuidado, um provider com bug ou uma API com volume inesperado poderia postar mensagens sem parar (o unico controle antes era o intervalo de 5 minutos entre polls, sem teto algum). `JOBS_MAX_PER_DAY` (padrao 15) limita quantas vagas **novas** podem ser descobertas por dia civil (contagem por `discoveredAt`, reseta a meia-noite no fuso configurado em `TZ`); ao atingir o limite o poll seguinte nem chega a chamar os providers, so registra um log e sai. O limite conta vagas distintas, nao mensagens (cada vaga ainda vai para os 2 grupos de vagas).
 
@@ -238,8 +248,9 @@ REMOTEOK_JOBS_ENABLED=false
 REMOTEOK_JOBS_COUNT=20
 ARBEITNOW_JOBS_ENABLED=false
 ARBEITNOW_JOBS_COUNT=20
-HIMALAYAS_JOBS_ENABLED=false
-HIMALAYAS_JOBS_COUNT=20
+GREENHOUSE_JOBS_ENABLED=false
+GREENHOUSE_JOBS_COUNT=20
+GREENHOUSE_BOARD_SLUGS=nubank,stone,quintoandar,gympass,ebanx,wildlifestudios,vtex,rdstation,inter,c6bank
 JOBS_POLL_INTERVAL_MINUTES=5
 ```
 
@@ -256,6 +267,7 @@ npm run jobs:poll -- --dry-run --provider=remotive
 npm run jobs:poll -- --dry-run --provider=remoteok
 npm run jobs:poll -- --dry-run --provider=arbeitnow
 npm run jobs:poll -- --dry-run --provider=himalayas
+npm run jobs:poll -- --dry-run --provider=greenhouse
 ```
 
 Rodar polling real manualmente:

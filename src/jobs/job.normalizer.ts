@@ -66,7 +66,7 @@ export function inferLevel(value: string): JobLevel | undefined {
 export function inferCategory(value: string): JobCategory {
   const text = normalizeForMatch(value);
 
-  if (/\bqa\b|quality assurance|quality|tester|testador|test automation|qualidade de software/.test(text)) {
+  if (/\bqa\b|quality assurance|quality|tester|testador|test automation|analista de qualidade|automacao de (teste|software)/.test(text)) {
     return "qa";
   }
 

@@ -20,7 +20,11 @@ const levelLabels: Record<NonNullable<NormalizedJob["level"]>, string> = {
 };
 
 export function formatJobMessage(job: NormalizedJob): string {
-  const lines = ["Nova vaga", "", job.title, "", job.company, "Remoto"];
+  const lines = ["Nova vaga", "", job.title, "", job.company];
+
+  if (job.remote) {
+    lines.push("Remoto");
+  }
 
   if (job.location) {
     lines.push(job.location);

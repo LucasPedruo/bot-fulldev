@@ -1,5 +1,6 @@
 import { formatJobMessage } from "../job.formatter.js";
 import { ArbeitnowProvider } from "../providers/arbeitnow.provider.js";
+import { GreenhouseProvider } from "../providers/greenhouse.provider.js";
 import { HimalayasProvider } from "../providers/himalayas.provider.js";
 import { JobicyProvider } from "../providers/jobicy.provider.js";
 import { RemoteokProvider } from "../providers/remoteok.provider.js";
@@ -14,7 +15,8 @@ const providersByName: Record<string, () => JobProvider> = {
   remotive: () => new RemotiveProvider(),
   remoteok: () => new RemoteokProvider(),
   arbeitnow: () => new ArbeitnowProvider(),
-  himalayas: () => new HimalayasProvider()
+  himalayas: () => new HimalayasProvider(),
+  greenhouse: () => new GreenhouseProvider()
 };
 
 if (process.argv.includes("--dry-run")) {
