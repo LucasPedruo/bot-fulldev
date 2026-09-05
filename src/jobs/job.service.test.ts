@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { env } from "../config/env.js";
 import { JobService, type JobRepositoryLike, type QueueServiceLike } from "./job.service.js";
 import type { NormalizedJob, PersistedJob } from "./job.types.js";
 import type { JobProvider } from "./providers/provider.interface.js";
@@ -34,7 +35,15 @@ class FakeProvider implements JobProvider {
 class FakeRepository implements JobRepositoryLike {
   public deliveries: Array<{ jobId: string; destinationGroup: string; queueMessageId: string }> = [];
 
-  constructor(private readonly duplicate?: PersistedJob) {}
+  constructor(
+    private readonly duplicate?: PersistedJob,
+    private readonly discoveredToday = 0
+  ) {}
+
+  async countDiscoveredSince(): Promise<number> {
+    await Promise.resolve();
+    return this.discoveredToday;
+  }
 
   async findDuplicate(): Promise<PersistedJob | undefined> {
     await Promise.resolve();
@@ -109,4 +118,29 @@ void test("JobService skips duplicate jobs", async () => {
   assert.equal(result.discovered, 0);
   assert.equal(result.skippedDuplicates, 1);
   assert.equal(queue.enqueued.length, 0);
+});
+
+void test("JobService skips polling entirely once the daily limit is already reached", async () => {
+  const repository = new FakeRepository(undefined, env.JOBS_MAX_PER_DAY);
+  const queue = new FakeQueue();
+  const service = new JobService([new FakeProvider([job])], repository, queue);
+
+  const result = await service.poll();
+
+  assert.equal(result.fetched, 0);
+  assert.equal(result.discovered, 0);
+  assert.equal(queue.enqueued.length, 0);
+});
+
+void test("JobService stops enqueueing once the daily limit is reached mid-poll", async () => {
+  const secondJob: NormalizedJob = { ...job, externalId: "job-2", fingerprint: "fingerprint-2" };
+  const repository = new FakeRepository(undefined, env.JOBS_MAX_PER_DAY - 1);
+  const queue = new FakeQueue();
+  const service = new JobService([new FakeProvider([job, secondJob])], repository, queue);
+
+  const result = await service.poll();
+
+  assert.equal(result.fetched, 2);
+  assert.equal(result.discovered, 1);
+  assert.equal(queue.enqueued.length, 2);
 });

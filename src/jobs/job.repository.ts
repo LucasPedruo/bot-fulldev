@@ -1,4 +1,4 @@
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, gte, or, sql } from "drizzle-orm";
 import { db } from "../database/client.js";
 import { jobDeliveries, jobs } from "../database/schema.js";
 import type { NormalizedJob, PersistedJob } from "./job.types.js";
@@ -37,6 +37,15 @@ export class JobRepository {
       .returning();
 
     return toPersistedJob(row);
+  }
+
+  async countDiscoveredSince(since: Date): Promise<number> {
+    const [row] = await db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(jobs)
+      .where(gte(jobs.discoveredAt, since));
+
+    return row?.value ?? 0;
   }
 
   async createDelivery(input: { jobId: string; destinationGroup: string; queueMessageId: string }): Promise<boolean> {

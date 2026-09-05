@@ -21,7 +21,7 @@ export type JobsPollResult = {
   providerFailures: number;
 };
 
-export type JobRepositoryLike = Pick<JobRepository, "createDelivery" | "findDuplicate" | "insert">;
+export type JobRepositoryLike = Pick<JobRepository, "countDiscoveredSince" | "createDelivery" | "findDuplicate" | "insert">;
 export type QueueServiceLike = {
   enqueue(input: Parameters<typeof queueService.enqueue>[0]): Promise<QueueMessage>;
 };
@@ -34,6 +34,14 @@ export class JobService {
   ) {}
 
   async poll(): Promise<JobsPollResult> {
+    const discoveredToday = await this.repository.countDiscoveredSince(startOfToday());
+    const dailyRemaining = env.JOBS_MAX_PER_DAY - discoveredToday;
+
+    if (dailyRemaining <= 0) {
+      logger.info({ maxPerDay: env.JOBS_MAX_PER_DAY, discoveredToday }, "Daily job limit reached, skipping poll");
+      return { fetched: 0, discovered: 0, queued: 0, skippedDuplicates: 0, providerFailures: 0 };
+    }
+
     const results = await Promise.allSettled(this.providers.map((provider) => provider.fetchJobs()));
     const fetchedJobs: NormalizedJob[] = [];
     let providerFailures = 0;
@@ -52,6 +60,10 @@ export class JobService {
     let skippedDuplicates = 0;
 
     for (const job of fetchedJobs) {
+      if (discovered >= dailyRemaining) {
+        break;
+      }
+
       const existing = await this.repository.findDuplicate(job);
       if (existing) {
         skippedDuplicates += 1;
@@ -105,6 +117,12 @@ export class JobService {
 }
 
 export const jobService = new JobService();
+
+function startOfToday(): Date {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return now;
+}
 
 function createDefaultProviders(): JobProvider[] {
   return [

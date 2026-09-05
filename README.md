@@ -221,10 +221,13 @@ GET https://himalayas.app/jobs/api/search?country=Brazil&seniority=Entry-level,M
 
 Nenhuma dessas 4 APIs expoe um filtro de categoria "tech" confiavel (RemoteOK e Arbeitnow nao tem categoria nenhuma; o `parentCategories` do Himalayas fica vazio mesmo em vagas claramente tecnicas), entao o provider filtra localmente pelo **titulo** da vaga com tecnologias conhecidas e palavras-chave de cargo (developer/desenvolvedor, engineer/engenheiro, devops, qa, etc. — o Himalayas usa palavras-chave em portugues tambem). Tags e descricao nao entram nessa decisao porque sao texto livre e geram falsos positivos (ex.: tag "react" numa vaga de gerente de loja no RemoteOK, "engineering" mencionado na descricao de uma vaga de suporte no Arbeitnow).
 
-Em desenvolvimento local, `.env.local` deixa `JOBS_POLL_ENABLED=false` para evitar postar dezenas de vagas acidentalmente nos grupos reais. Em producao, habilite os providers um de cada vez. O foco atual do bot e vagas brasileiras estagio/junior/pleno, entao o Jobicy (internacional, sem filtro de nivel) fica desabilitado por padrao em producao junto com Remotive/RemoteOK/Arbeitnow, deixando so o Himalayas ativo:
+Sem cuidado, um provider com bug ou uma API com volume inesperado poderia postar mensagens sem parar (o unico controle antes era o intervalo de 5 minutos entre polls, sem teto algum). `JOBS_MAX_PER_DAY` (padrao 15) limita quantas vagas **novas** podem ser descobertas por dia civil (contagem por `discoveredAt`, reseta a meia-noite no fuso configurado em `TZ`); ao atingir o limite o poll seguinte nem chega a chamar os providers, so registra um log e sai. O limite conta vagas distintas, nao mensagens (cada vaga ainda vai para os 2 grupos de vagas).
+
+Em desenvolvimento local, o foco atual do bot e vagas brasileiras estagio/junior/pleno, entao o Jobicy (internacional, sem filtro de nivel) fica desabilitado em producao junto com Remotive/RemoteOK/Arbeitnow, deixando so o Himalayas ativo, com contagem baixa:
 
 ```env
 JOBS_POLL_ENABLED=true
+JOBS_MAX_PER_DAY=15
 JOBICY_JOBS_ENABLED=false
 JOBICY_JOBS_COUNT=50
 HIMALAYAS_JOBS_ENABLED=true
