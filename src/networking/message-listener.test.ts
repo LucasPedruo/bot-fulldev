@@ -9,6 +9,8 @@ import {
 
 const networkingGroups = ["120363000000000001@g.us", "120363000000000002@g.us"];
 const botJid = "551100000000:1@s.whatsapp.net";
+const botLid = "999888777:1@lid";
+const getBotJids = () => [botJid, botLid];
 
 class FakeRepository implements NetworkingRepositoryLike {
   public touched: string[] = [];
@@ -54,7 +56,7 @@ function buildMessage(input: {
 void test("ignores messages outside the configured networking groups", async () => {
   const repository = new FakeRepository();
   const mentionService = new FakeMentionService();
-  const listener = createNetworkingMessageListener({ getBotJid: () => botJid, networkingGroups, repository, mentionService });
+  const listener = createNetworkingMessageListener({ getBotJids, networkingGroups, repository, mentionService });
 
   await listener(buildMessage({ remoteJid: "120363999999999999@g.us" }));
 
@@ -65,7 +67,7 @@ void test("ignores messages outside the configured networking groups", async () 
 void test("tracks activity for a plain networking-group message without replying", async () => {
   const repository = new FakeRepository();
   const mentionService = new FakeMentionService();
-  const listener = createNetworkingMessageListener({ getBotJid: () => botJid, networkingGroups, repository, mentionService });
+  const listener = createNetworkingMessageListener({ getBotJids, networkingGroups, repository, mentionService });
 
   await listener(buildMessage({ remoteJid: networkingGroups[0], participant: "5511999999999@s.whatsapp.net" }));
 
@@ -76,7 +78,7 @@ void test("tracks activity for a plain networking-group message without replying
 void test("delegates to the mention service when the bot is mentioned in a networking group", async () => {
   const repository = new FakeRepository();
   const mentionService = new FakeMentionService();
-  const listener = createNetworkingMessageListener({ getBotJid: () => botJid, networkingGroups, repository, mentionService });
+  const listener = createNetworkingMessageListener({ getBotJids, networkingGroups, repository, mentionService });
 
   await listener(
     buildMessage({
@@ -90,10 +92,26 @@ void test("delegates to the mention service when the bot is mentioned in a netwo
   assert.deepEqual(mentionService.handled, [{ groupJid: networkingGroups[0], senderJid: "5511999999999@s.whatsapp.net" }]);
 });
 
+void test("recognizes a mention that uses the bot's LID instead of its phone-number JID", async () => {
+  const repository = new FakeRepository();
+  const mentionService = new FakeMentionService();
+  const listener = createNetworkingMessageListener({ getBotJids, networkingGroups, repository, mentionService });
+
+  await listener(
+    buildMessage({
+      remoteJid: networkingGroups[0],
+      participant: "162783622594588@lid",
+      mentionedJid: ["999888777@lid"]
+    })
+  );
+
+  assert.deepEqual(mentionService.handled, [{ groupJid: networkingGroups[0], senderJid: "162783622594588@lid" }]);
+});
+
 void test("does not delegate for its own messages even if they technically mention it", async () => {
   const repository = new FakeRepository();
   const mentionService = new FakeMentionService();
-  const listener = createNetworkingMessageListener({ getBotJid: () => botJid, networkingGroups, repository, mentionService });
+  const listener = createNetworkingMessageListener({ getBotJids, networkingGroups, repository, mentionService });
 
   await listener(
     buildMessage({

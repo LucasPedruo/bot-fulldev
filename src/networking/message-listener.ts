@@ -7,7 +7,10 @@ export type NetworkingRepositoryLike = Pick<NetworkingRepository, "touchActivity
 export type MentionReplyServiceLike = Pick<MentionReplyService, "handleMention">;
 
 export type NetworkingMessageListenerOptions = {
-  getBotJid: () => string | undefined;
+  // WhatsApp mentions can reference either the phone-number JID (...@s.whatsapp.net) or the
+  // newer LID identity (...@lid), depending on the group's addressing mode - both must be
+  // supplied so a mention is recognized regardless of which one WhatsApp used.
+  getBotJids: () => string[];
   networkingGroups?: string[];
   repository?: NetworkingRepositoryLike;
   mentionService?: MentionReplyServiceLike;
@@ -36,14 +39,14 @@ export function createNetworkingMessageListener(
       return;
     }
 
-    const botJid = options.getBotJid();
-    if (!botJid) {
+    const botJids = options.getBotJids();
+    if (botJids.length === 0) {
       return;
     }
 
     const mentionedJids = message.message?.extendedTextMessage?.contextInfo?.mentionedJid ?? [];
-    const normalizedBotJid = jidNormalizedUser(botJid);
-    const wasMentioned = mentionedJids.some((jid) => jidNormalizedUser(jid) === normalizedBotJid);
+    const normalizedBotJids = new Set(botJids.map(jidNormalizedUser));
+    const wasMentioned = mentionedJids.some((jid) => normalizedBotJids.has(jidNormalizedUser(jid)));
 
     if (!wasMentioned) {
       return;

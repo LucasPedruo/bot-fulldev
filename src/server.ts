@@ -21,7 +21,14 @@ async function start(): Promise<void> {
     logger.info("Database migrations applied");
 
     if (env.NETWORKING_IDLE_ENABLED) {
-      whatsapp.setMessageHandler(createNetworkingMessageListener({ getBotJid: () => whatsapp.getSocket()?.user?.id }));
+      whatsapp.setMessageHandler(
+        createNetworkingMessageListener({
+          getBotJids: () => {
+            const user = whatsapp.getSocket()?.user;
+            return [user?.id, user?.lid].filter((jid): jid is string => Boolean(jid));
+          }
+        })
+      );
       whatsapp.setGroupParticipantsHandler(createNetworkingMembershipListener());
     }
 
