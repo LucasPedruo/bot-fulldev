@@ -19,8 +19,7 @@ class FakeRepository implements NetworkingRepositoryLike {
 
   constructor(
     private readonly recentSpotlightJids: string[] = [],
-    private readonly messagesToday = 0,
-    private readonly membership = { joined: 0, left: 0 }
+    private readonly messagesToday = 0
   ) {}
 
   async getRecentSpotlightJids(): Promise<string[]> {
@@ -36,11 +35,6 @@ class FakeRepository implements NetworkingRepositoryLike {
   async getMessagesToday(): Promise<number> {
     await Promise.resolve();
     return this.messagesToday;
-  }
-
-  async countMembershipEventsToday(): Promise<{ joined: number; left: number }> {
-    await Promise.resolve();
-    return this.membership;
   }
 }
 
@@ -202,8 +196,8 @@ void test("postSpotlight logs and continues when listing participants fails", as
   assert.deepEqual(queue.enqueued, []);
 });
 
-void test("postDailySummary combines stats, messages, and membership counts", async () => {
-  const repository = new FakeRepository([], 42, { joined: 2, left: 1 });
+void test("postDailySummary combines stats and message counts", async () => {
+  const repository = new FakeRepository([], 42);
   const queue = new FakeQueue();
   const service = new NetworkingScheduledService(
     repository,
@@ -224,8 +218,7 @@ void test("postDailySummary combines stats, messages, and membership counts", as
   const payload = queue.enqueued[0].payload as TextMessagePayload;
   assert.match(payload.text, /Vagas descobertas hoje: 3/);
   assert.match(payload.text, /Vagas enviadas hoje: 6/);
-  assert.match(payload.text, /Mensagens com falha hoje: 2/);
   assert.match(payload.text, /Mensagens trocadas no grupo: 42/);
-  assert.match(payload.text, /Pessoas que entraram: 2/);
-  assert.match(payload.text, /Pessoas que saíram: 1/);
+  assert.doesNotMatch(payload.text, /Mensagens com falha/);
+  assert.doesNotMatch(payload.text, /Pessoas que/);
 });

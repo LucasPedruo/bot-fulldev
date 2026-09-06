@@ -83,19 +83,6 @@ export class NetworkingRepository {
     await db.insert(groupMembershipLog).values({ groupJid, participantJid, action });
   }
 
-  async countMembershipEventsToday(groupJid: string, since: Date): Promise<{ joined: number; left: number }> {
-    const rows = await db
-      .select({ action: groupMembershipLog.action, value: sql<number>`count(*)::int` })
-      .from(groupMembershipLog)
-      .where(and(eq(groupMembershipLog.groupJid, groupJid), gte(groupMembershipLog.occurredAt, since)))
-      .groupBy(groupMembershipLog.action);
-
-    return {
-      joined: rows.find((row) => row.action === "add")?.value ?? 0,
-      left: rows.find((row) => row.action === "remove")?.value ?? 0
-    };
-  }
-
   async getRecentSpotlightJids(groupJid: string, since: Date): Promise<string[]> {
     const rows = await db
       .select({ participantJid: networkingSpotlightLog.participantJid })

@@ -8,10 +8,7 @@ import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
 import { NetworkingRepository } from "./networking.repository.js";
 import { buildDailySummary, pickSpotlightMessage, type SpotlightSlot } from "./scheduled-content.js";
 
-export type NetworkingRepositoryLike = Pick<
-  NetworkingRepository,
-  "getRecentSpotlightJids" | "recordSpotlight" | "getMessagesToday" | "countMembershipEventsToday"
->;
+export type NetworkingRepositoryLike = Pick<NetworkingRepository, "getRecentSpotlightJids" | "recordSpotlight" | "getMessagesToday">;
 export type StatsServiceLike = Pick<StatsService, "computeDailyStats">;
 export type QueueServiceLike = {
   enqueue(input: Parameters<typeof queueService.enqueue>[0]): Promise<QueueMessage>;
@@ -87,17 +84,18 @@ export class NetworkingScheduledService {
     const startOfToday = new Date(this.now());
     startOfToday.setHours(0, 0, 0, 0);
 
-    const [dailyStats, messagesToday, membership] = await Promise.all([
+    const [dailyStats, messagesToday] = await Promise.all([
       this.stats.computeDailyStats(startOfToday),
-      this.repository.getMessagesToday(groupJid, this.now()),
-      this.repository.countMembershipEventsToday(groupJid, startOfToday)
+      this.repository.getMessagesToday(groupJid, this.now())
     ]);
 
     const text = buildDailySummary({
-      ...dailyStats,
+      jobsDiscovered: dailyStats.jobsDiscovered,
+      jobsSent: dailyStats.jobsSent,
+      eventsDiscovered: dailyStats.eventsDiscovered,
+      eventsSent: dailyStats.eventsSent,
+      eventRemindersSent: dailyStats.eventRemindersSent,
       messagesToday,
-      joinedToday: membership.joined,
-      leftToday: membership.left,
       weekday: this.now().getDay()
     });
 

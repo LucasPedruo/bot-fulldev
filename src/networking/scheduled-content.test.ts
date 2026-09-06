@@ -32,11 +32,7 @@ const baseSummaryInput = {
   eventsDiscovered: 0,
   eventsSent: 0,
   eventRemindersSent: 0,
-  networkingMessagesSent: 0,
-  failedMessages: 0,
   messagesToday: 0,
-  joinedToday: 0,
-  leftToday: 0,
   weekday: 3
 };
 
@@ -48,11 +44,7 @@ void test("buildDailySummary includes every stat metric", () => {
     eventsDiscovered: 0,
     eventsSent: 0,
     eventRemindersSent: 1,
-    networkingMessagesSent: 9,
-    failedMessages: 2,
-    messagesToday: 42,
-    joinedToday: 2,
-    leftToday: 1
+    messagesToday: 42
   });
 
   assert.match(summary, /Vagas descobertas hoje: 3/);
@@ -60,11 +52,11 @@ void test("buildDailySummary includes every stat metric", () => {
   assert.match(summary, /Eventos descobertos hoje: 0/);
   assert.match(summary, /Eventos enviados hoje: 0/);
   assert.match(summary, /Lembretes de eventos enviados hoje: 1/);
-  assert.match(summary, /Mensagens de networking enviadas hoje: 9/);
   assert.match(summary, /Mensagens trocadas no grupo: 42/);
-  assert.match(summary, /Pessoas que entraram: 2/);
-  assert.match(summary, /Pessoas que saíram: 1/);
-  assert.match(summary, /Mensagens com falha hoje: 2/);
+  assert.doesNotMatch(summary, /Pessoas que entraram/);
+  assert.doesNotMatch(summary, /Pessoas que saíram/);
+  assert.doesNotMatch(summary, /Mensagens com falha/);
+  assert.doesNotMatch(summary, /Mensagens de networking enviadas/);
 });
 
 void test("buildDailySummary varies the intro on Monday and Friday", () => {

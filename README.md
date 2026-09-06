@@ -283,6 +283,10 @@ docker compose exec app node dist/jobs/cli/poll.js --dry-run
 docker compose exec app node dist/jobs/cli/poll.js
 ```
 
+### Perguntar sobre vagas
+
+**Marcando o bot** com `@` em qualquer um dos 2 grupos de Vagas (ex.: "@bot me diga vagas de junior frontend"), ele responde com o que ja esta no banco filtrado por nivel e/ou categoria — mesmo padrao do Q&A de eventos (mencao obrigatoria, sem IA). O parsing (`src/jobs/job-query.ts`) reaproveita as mesmas funcoes que ja classificam as vagas (`inferLevel`/`inferCategory` de `job.normalizer.ts`), com um cuidado a mais: o padrao de deteccao de IA/dados inclui a palavra solta "ai" (sigla em ingles), que colide com a interjeicao super comum "e aí" depois de perder o acento — por isso essa interjeicao e removida antes de inferir a categoria. Uma mencao sem nivel/categoria especifico lista as vagas mais recentes.
+
 ## Silencio noturno
 
 Nenhuma mensagem do bot sai entre `QUIET_HOURS_START` e `QUIET_HOURS_END` (padrao 00:00-07:00), independente do tipo (vaga, evento, networking, manual) — **exceto** mensagens marcadas explicitamente com `bypassQuietHours: true` ao enfileirar (coluna `bypass_quiet_hours` em `message_queue`). A regra fica num unico lugar, `QueueRepository.claimNext` (`src/queue/queue.repository.ts`): o `QueueWorker` (`src/queue/queue.worker.ts`) informa se `isQuietHours` (`src/shared/quiet-hours.ts`) esta ativo, e o `claimNext` so reivindica mensagens com o flag de bypass enquanto isso for verdade. Mensagens comuns agendadas para a madrugada continuam `pending` e saem automaticamente assim que a janela termina.
@@ -319,6 +323,8 @@ NETWORKING_MENTION_COOLDOWN_HOURS=2
 
 ### Resposta de mencao com IA
 
+**Escopo deliberadamente restrito ao networking** — a IA so responde mencoes nos grupos de Networking. Eventos e Vagas tem seus proprios Q&A (veja "Perguntar sobre eventos"/"Perguntar sobre vagas"), mas ambos usam so parsing por palavra-chave, nunca IA — decisao explicita do usuario pra manter esses dois grupos previsiveis (uma resposta gerada por IA fora do padrao esperado ali viraria bagunça, diferente do networking onde a resposta e so uma brincadeira).
+
 As respostas de mencao continuam por template por padrao (`pickMentionReply`), mas podem opcionalmente usar uma IA de verdade via [Groq](https://console.groq.com) — API gratuita e compativel com o formato da OpenAI (`chat/completions`), sem cartao de credito, com limite de taxa (~30 req/min) muito acima do que essa feature usa (no maximo `NETWORKING_MENTION_MAX_PER_HOUR` por grupo). Comparado com o free tier do Gemini, cuja politica publica diz que humanos podem revisar/usar o conteudo pra treinar o modelo, o Groq (hospeda modelos abertos, nao treina os proprios) nao documenta essa pratica — mais adequado pra conteudo de um grupo real. OpenAI nao tem free tier de API (so o ChatGPT web e gratis, a API cobra desde o primeiro request).
 
 `MentionAiProvider` (`src/networking/mention-ai.provider.ts`) manda o texto de quem mencionou o bot como contexto (`buildMentionPrompt`) com um system prompt fixando o tom (engraçado, autodepreciativo, PT-BR, uma frase curta). Qualquer falha (sem chave configurada, timeout de 10s, rate limit, resposta vazia) cai automaticamente pro template normal — nunca trava nem derruba a resposta.
@@ -338,7 +344,7 @@ Diferente da ociosidade (reativa), estas sao mensagens em **horario fixo**, todo
 - **Spotlight** as `NETWORKING_MORNING_TIME`/`NETWORKING_LUNCH_TIME`/`NETWORKING_NIGHT_TIME` (08h/12h/20h por padrao): sorteia um participante real do grupo (via `WhatsAppConnectionManager.listParticipants`, novo, mesmo padrao de `listGroups`), exclui o proprio bot (telefone e LID — veja a nota sobre LID abaixo), evita repetir quem foi sorteado nas ultimas 24h (com fallback pro grupo inteiro se isso zerar as opcoes). Segunda e sexta usam moldes de mensagem proprios, diferentes do dia normal.
 - **Resumo real** as `NETWORKING_SUMMARY_TIME` (18h por padrao): ao inves de spotlight, posta um resumo com dados de verdade do dia — nao e texto generico. Ve a secao Estatisticas abaixo pros numeros exatos que entram nesse resumo.
 
-Novas tabelas: `group_membership_log` (historico de entrada/saida, usado pelo resumo), `networking_spotlight_log` (evita repetir participante).
+Novas tabelas: `group_membership_log` (historico de entrada/saida, registrado mas nao mais exibido no resumo — ver nota abaixo), `networking_spotlight_log` (evita repetir participante).
 
 ```env
 NETWORKING_SCHEDULED_ENABLED=false
@@ -346,7 +352,9 @@ NETWORKING_SCHEDULED_ENABLED=false
 
 ## Estatisticas
 
-Os numeros pedidos (vagas descobertas/enviadas, eventos descobertos/enviados, lembretes de evento enviados, mensagens de networking enviadas, mensagens com falha) sao calculados a partir de mensagens **realmente enviadas/falhadas na fila** (`StatsService`, `src/stats/stats.service.ts`) — nao e estimativa. Por escolha do usuario, esses numeros nao tem endpoint nem comando CLI proprio: eles aparecem automaticamente dentro do resumo diario das 18h descrito acima.
+Os numeros sao calculados a partir de mensagens **realmente enviadas/falhadas na fila** (`StatsService`, `src/stats/stats.service.ts`) — nao e estimativa. Por escolha do usuario, esses numeros nao tem endpoint nem comando CLI proprio: eles aparecem automaticamente dentro do resumo diario das 18h descrito acima.
+
+O resumo diario (`buildDailySummary`, `src/networking/scheduled-content.ts`) mostra vagas descobertas/enviadas, eventos descobertos/enviados, lembretes de evento enviados e mensagens trocadas no grupo. `StatsService` ainda calcula mensagens de networking enviadas e mensagens com falha (podem ser uteis pra debug/futuro), e `group_membership_log` ainda registra entradas/saidas — mas nenhum desses 4 numeros aparece mais no resumo (removidos a pedido do usuario, por ficarem sempre zerados/pouco uteis no dia a dia).
 
 ## Memes
 

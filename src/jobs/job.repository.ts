@@ -1,9 +1,15 @@
-import { and, eq, gte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, or, sql } from "drizzle-orm";
 import { db } from "../database/client.js";
 import { jobDeliveries, jobs } from "../database/schema.js";
-import type { NormalizedJob, PersistedJob } from "./job.types.js";
+import type { JobCategory, JobLevel, NormalizedJob, PersistedJob } from "./job.types.js";
 
 type JobRow = typeof jobs.$inferSelect;
+
+export type JobQueryFilter = {
+  level?: JobLevel;
+  category?: JobCategory;
+  limit?: number;
+};
 
 export class JobRepository {
   async findDuplicate(job: NormalizedJob): Promise<PersistedJob | undefined> {
@@ -56,6 +62,28 @@ export class JobRepository {
       .returning({ id: jobDeliveries.id });
 
     return Boolean(row);
+  }
+
+  // Backs the jobs Q&A feature: answers "vagas de junior frontend?" against what's actually stored.
+  async query(filter: JobQueryFilter): Promise<PersistedJob[]> {
+    const conditions = [];
+
+    if (filter.level) {
+      conditions.push(eq(jobs.level, filter.level));
+    }
+
+    if (filter.category) {
+      conditions.push(eq(jobs.category, filter.category));
+    }
+
+    const rows = await db
+      .select()
+      .from(jobs)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(jobs.discoveredAt))
+      .limit(filter.limit ?? 5);
+
+    return rows.map(toPersistedJob);
   }
 }
 

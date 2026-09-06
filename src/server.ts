@@ -4,6 +4,7 @@ import { env } from "./config/env.js";
 import { closeDatabase } from "./database/client.js";
 import { runMigrations } from "./database/migrate.js";
 import { createEventQnaListener } from "./events/event-qna-listener.js";
+import { createJobQnaListener } from "./jobs/job-qna-listener.js";
 import { createNetworkingMembershipListener } from "./networking/membership-listener.js";
 import { createNetworkingMessageListener } from "./networking/message-listener.js";
 import { queueWorker } from "./queue/queue.worker.js";
@@ -44,6 +45,10 @@ async function start(): Promise<void> {
 
     if (env.EVENTS_POLL_ENABLED) {
       messageHandlers.push(createEventQnaListener({ getBotJids }));
+    }
+
+    if (env.JOBS_POLL_ENABLED) {
+      messageHandlers.push(createJobQnaListener({ getBotJids }));
     }
 
     if (messageHandlers.length > 0) {

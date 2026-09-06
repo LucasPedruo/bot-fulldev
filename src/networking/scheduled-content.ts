@@ -55,11 +55,7 @@ export type DailySummaryInput = {
   eventsDiscovered: number;
   eventsSent: number;
   eventRemindersSent: number;
-  networkingMessagesSent: number;
-  failedMessages: number;
   messagesToday: number;
-  joinedToday: number;
-  leftToday: number;
   weekday: number;
 };
 
@@ -79,11 +75,7 @@ export function buildDailySummary(input: DailySummaryInput): string {
     `Eventos descobertos hoje: ${input.eventsDiscovered}`,
     `Eventos enviados hoje: ${input.eventsSent}`,
     `Lembretes de eventos enviados hoje: ${input.eventRemindersSent}`,
-    `Mensagens de networking enviadas hoje: ${input.networkingMessagesSent}`,
-    `Mensagens trocadas no grupo: ${input.messagesToday}`,
-    `Pessoas que entraram: ${input.joinedToday}`,
-    `Pessoas que saíram: ${input.leftToday}`,
-    `Mensagens com falha hoje: ${input.failedMessages}`
+    `Mensagens trocadas no grupo: ${input.messagesToday}`
   ].join("\n");
 }
 
