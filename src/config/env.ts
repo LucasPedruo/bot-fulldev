@@ -81,6 +81,8 @@ const envSchema = z.object({
   AGENDA_TECH_BRASIL_EVENTS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(true),
   LUMA_EVENTS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
   EVENTOSTI_DEV_EVENTS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  CAFEBUGADO_EVENTS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  PUPPETEER_EXECUTABLE_PATH: z.string().optional().default(""),
   NETWORKING_MORNING_TIME: timeSchema.default("08:00"),
   NETWORKING_LUNCH_TIME: timeSchema.default("12:00"),
   NETWORKING_SUMMARY_TIME: timeSchema.default("18:00"),

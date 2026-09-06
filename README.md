@@ -400,7 +400,15 @@ Ignora anos/meses ja arquivados e qualquer evento cuja data ja passou, monta um 
 
 **EventostiDev** (`src/events/providers/eventosti-dev.provider.ts`, `EVENTOSTI_DEV_EVENTS_ENABLED`, desativado por padrao) — faz parse (via `cheerio`) dos cards da secao "Proximos Eventos" de `eventosti.dev`, um agregador exclusivamente de tecnologia (sem filtro de tema necessario, mesmo caso do AgendaTechBrasil). Volume baixo (poucos eventos cadastrados por vez).
 
-Sympla foi descartado como fonte de scraping: alem da mesma restricao de API do organizador, as paginas de evento usam React Server Components em streaming (sem `__NEXT_DATA__` ou JSON estavel), tornando o parsing impraticavel.
+**CafeBugado** (`src/events/providers/cafebugado.provider.ts`, `CAFEBUGADO_EVENTS_ENABLED`, desativado por padrao) — `eventos.cafebugado.com.br` tambem e Next.js com React Server Components, mas ao contrario do Sympla o problema nao e bloqueio de bot: o HTML bruto (o que `fetch`/`cheerio` veem) embute os dados dos eventos como texto solto e mal formatado, sem schema fixo. A pagina renderizada de verdade num navegador, porem, e uma grade de cards Material-UI limpa (titulo, data, hora, dia da semana, modalidade, cidade) — confirmado inspecionando com um navegador headless de verdade. Por isso esse e o **unico provider que usa Puppeteer** (`puppeteer` como dependencia real, nao `fetch`+`cheerio` como os outros) — dependencia deliberadamente mais pesada (Chromium de verdade), aceita pelo usuario so pra essa fonte. Detalhes tecnicos:
+
+- Os campos de cada card (data `DD/MM/AAAA`, hora `HH:MM`, dia da semana, modalidade, cidade) sao identificados pelo **formato do valor**, nao pela posicao — um evento online pode nao ter campo de cidade, deslocando a ordem.
+- O botao "Saber mais sobre o evento" nao e um link, e um `<button>` que abre uma aba nova via JavaScript — descobrir a URL real de cada evento exigiria clicar em cada um dos ~50 eventos (6 paginas) a cada consulta. Por escolha explicita do usuario, **toda mensagem desse provider aponta pra pagina geral de eventos** (`eventos.cafebugado.com.br/eventos`), nao pro evento especifico — mais rapido e simples que clicar evento por evento.
+- Percorre as paginas clicando nos botoes de paginacao (`goToPage`) ate acabarem as paginas.
+- As imagens dos cards vêm do CDN do Luma (`images.lumacdn.com`), sugerindo que esse site tambem reaproveita eventos de la — pode haver sobreposicao com o provider Luma (fingerprints diferentes por terem URL/fonte diferentes, entao nao ha dedup automatico entre os dois hoje).
+- Roda com `--no-sandbox` (Chromium como root no container). Em producao usa o Chromium do sistema operacional via `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` (setado no `Dockerfile`, instalado via `apt-get`) em vez do download proprio do Puppeteer (`PUPPETEER_SKIP_DOWNLOAD=true`) — **nao defina `PUPPETEER_EXECUTABLE_PATH` no `.env.local`/`.env.example`**, nem vazio: pelo mecanismo de `env_file` do docker-compose isso sobrescreveria o valor do Dockerfile.
+
+Sympla foi descartado como fonte de scraping: alem da mesma restricao de API do organizador, as paginas de evento usam React Server Components em streaming (sem `__NEXT_DATA__` ou JSON estavel) **e** bloqueio ativo via Cloudflare, tornando o parsing impraticavel mesmo com navegador headless.
 
 **So divulga o mes atual.** Um evento descoberto para um mes futuro fica salvo no banco (dedup normal, conta pro `EVENTS_MAX_PER_DAY`), mas so gera a mensagem de "Novo evento" quando `startDate` cai no mes corrente (comparado contra `America/Sao_Paulo`) — ou imediatamente, se for um evento "a definir" (sem data). Ele nao fica esquecido: continua existindo pros lembretes/promocao abaixo e pras perguntas no grupo, so nao e anunciado assim que descoberto (`isInCurrentMonth`, `event.normalizer.ts`).
 
@@ -422,14 +430,16 @@ EVENT_CLEANUP_TIME=03:00
 AGENDA_TECH_BRASIL_EVENTS_ENABLED=true
 LUMA_EVENTS_ENABLED=false
 EVENTOSTI_DEV_EVENTS_ENABLED=false
+CAFEBUGADO_EVENTS_ENABLED=false
 ```
 
-Validar sem salvar/enfileirar (por padrao usa o AgendaTechBrasil; `--provider=luma` ou `--provider=eventostidev` testam os outros):
+Validar sem salvar/enfileirar (por padrao usa o AgendaTechBrasil; os outros `--provider=` testam cada fonte):
 
 ```bash
 npm run events:poll -- --dry-run
 npm run events:poll -- --dry-run --provider=luma
 npm run events:poll -- --dry-run --provider=eventostidev
+npm run events:poll -- --dry-run --provider=cafebugado
 ```
 
 ## Descricao do grupo

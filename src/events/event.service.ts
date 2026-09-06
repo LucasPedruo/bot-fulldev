@@ -10,6 +10,7 @@ import { isInCurrentMonth } from "./event.normalizer.js";
 import { EventRepository } from "./event.repository.js";
 import type { EventNotificationType, NormalizedEvent, PersistedEvent } from "./event.types.js";
 import { AgendaTechBrasilProvider } from "./providers/agenda-tech-brasil.provider.js";
+import { CafebugadoProvider } from "./providers/cafebugado.provider.js";
 import { EventostiDevProvider } from "./providers/eventosti-dev.provider.js";
 import { LumaProvider } from "./providers/luma.provider.js";
 import type { EventProvider } from "./providers/provider.interface.js";
@@ -252,6 +253,7 @@ function createDefaultProviders(): EventProvider[] {
   return [
     ...(env.AGENDA_TECH_BRASIL_EVENTS_ENABLED ? [new AgendaTechBrasilProvider()] : []),
     ...(env.LUMA_EVENTS_ENABLED ? [new LumaProvider()] : []),
-    ...(env.EVENTOSTI_DEV_EVENTS_ENABLED ? [new EventostiDevProvider()] : [])
+    ...(env.EVENTOSTI_DEV_EVENTS_ENABLED ? [new EventostiDevProvider()] : []),
+    ...(env.CAFEBUGADO_EVENTS_ENABLED ? [new CafebugadoProvider()] : [])
   ];
 }
