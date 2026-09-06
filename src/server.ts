@@ -5,6 +5,8 @@ import { runMigrations } from "./database/migrate.js";
 import { createNetworkingMembershipListener } from "./networking/membership-listener.js";
 import { createNetworkingMessageListener } from "./networking/message-listener.js";
 import { queueWorker } from "./queue/queue.worker.js";
+import { eventRemindersScheduler } from "./scheduler/event-reminders.scheduler.js";
+import { eventsScheduler } from "./scheduler/events.scheduler.js";
 import { jobsScheduler } from "./scheduler/jobs.scheduler.js";
 import { networkingIdleScheduler } from "./scheduler/networking-idle.scheduler.js";
 import { networkingScheduledScheduler } from "./scheduler/networking-scheduled.scheduler.js";
@@ -60,6 +62,13 @@ async function start(): Promise<void> {
       logger.info("Networking scheduled scheduler disabled");
     }
 
+    if (env.EVENTS_POLL_ENABLED) {
+      eventsScheduler.start();
+      eventRemindersScheduler.start();
+    } else {
+      logger.info("Events scheduler disabled");
+    }
+
     await app.listen({ host: env.HOST, port: env.PORT });
     logger.info({ host: env.HOST, port: env.PORT, timezone: env.TZ }, "Server started");
   } catch (error) {
@@ -73,6 +82,8 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   jobsScheduler.stop();
   networkingIdleScheduler.stop();
   networkingScheduledScheduler.stop();
+  eventsScheduler.stop();
+  eventRemindersScheduler.stop();
   queueWorker.stop();
   whatsapp.stop();
   await app.close();

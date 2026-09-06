@@ -145,6 +145,53 @@ export const memes = pgTable("memes", {
   lastUsedAt: timestamp("last_used_at", { withTimezone: true })
 });
 
+export const eventModality = pgEnum("event_modality", ["in_person", "online", "hybrid"]);
+
+export const events = pgTable(
+  "events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    externalId: text("external_id").notNull(),
+    source: text("source").notNull(),
+    title: text("title").notNull(),
+    location: text("location"),
+    modality: eventModality("modality").notNull(),
+    url: text("url").notNull(),
+    fingerprint: text("fingerprint").notNull().unique(),
+    // Null for "to be announced" events with no confirmed date.
+    startDate: timestamp("start_date", { withTimezone: true }),
+    discoveredAt: timestamp("discovered_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    unique("events_source_external_id_unique").on(table.source, table.externalId),
+    index("events_source_idx").on(table.source),
+    index("events_discovered_at_idx").on(table.discoveredAt),
+    index("events_start_date_idx").on(table.startDate)
+  ]
+);
+
+export const eventNotificationType = pgEnum("event_notification_type", [
+  "new_event",
+  "registration_open",
+  "event_7_days",
+  "event_3_days",
+  "event_tomorrow",
+  "event_today"
+]);
+
+export const eventNotifications = pgTable(
+  "event_notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id),
+    type: eventNotificationType("type").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [unique("event_notifications_event_type_unique").on(table.eventId, table.type)]
+);
+
 export const networkingTopicType = pgEnum("networking_topic_type", ["joke", "poll", "critique", "news"]);
 
 export const networkingTopicHistory = pgTable(
