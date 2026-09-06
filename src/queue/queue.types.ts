@@ -26,6 +26,7 @@ export type QueueMessage = {
   payload: MessagePayload;
   status: MessageQueueStatus;
   priority: number;
+  bypassQuietHours: boolean;
   scheduledFor: Date;
   attempts: number;
   createdAt: Date;
@@ -40,4 +41,7 @@ export type EnqueueMessageInput = {
   payload: MessagePayload;
   priority?: number;
   scheduledFor?: Date;
+  /** Exempts this message from the 00:00-07:00 quiet-hours block. Reserve for low-frequency,
+   * reactive events (e.g. group join/leave) - never for anything that could repeat or spam. */
+  bypassQuietHours?: boolean;
 };

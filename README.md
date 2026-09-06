@@ -285,7 +285,9 @@ docker compose exec app node dist/jobs/cli/poll.js
 
 ## Silencio noturno
 
-Nenhuma mensagem do bot sai entre `QUIET_HOURS_START` e `QUIET_HOURS_END` (padrao 00:00-07:00), independente do tipo (vaga, evento, networking, manual). A regra fica num unico lugar, `QueueWorker.processOne` (`src/queue/queue.worker.ts`), que se recusa a reivindicar qualquer mensagem da fila enquanto `isQuietHours` (`src/shared/quiet-hours.ts`) for verdadeiro. Mensagens agendadas para a madrugada continuam `pending` e saem automaticamente assim que a janela termina — nenhum outro modulo (scheduler, service, listener) precisa se preocupar com isso.
+Nenhuma mensagem do bot sai entre `QUIET_HOURS_START` e `QUIET_HOURS_END` (padrao 00:00-07:00), independente do tipo (vaga, evento, networking, manual) — **exceto** mensagens marcadas explicitamente com `bypassQuietHours: true` ao enfileirar (coluna `bypass_quiet_hours` em `message_queue`). A regra fica num unico lugar, `QueueRepository.claimNext` (`src/queue/queue.repository.ts`): o `QueueWorker` (`src/queue/queue.worker.ts`) informa se `isQuietHours` (`src/shared/quiet-hours.ts`) esta ativo, e o `claimNext` so reivindica mensagens com o flag de bypass enquanto isso for verdade. Mensagens comuns agendadas para a madrugada continuam `pending` e saem automaticamente assim que a janela termina.
+
+Hoje só as mensagens de entrada/saida de grupo (`src/networking/membership-listener.ts`) usam esse bypass — são eventos reativos e de baixa frequência (não repetem sozinhos como um tópico de ociosidade ou uma vaga postada), então o usuário pediu para elas não esperarem a janela de silêncio passar. Novos usos do bypass devem seguir o mesmo criterio: só para algo que não vai se repetir/spammar.
 
 ## Networking: ociosidade, mencoes e entrada/saida
 

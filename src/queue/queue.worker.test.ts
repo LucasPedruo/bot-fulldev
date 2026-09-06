@@ -16,9 +16,14 @@ class FakeRepository {
     return 1;
   }
 
-  async claimNext(): Promise<QueueMessage | undefined> {
+  async claimNext(_now?: Date, quietHoursActive = false): Promise<QueueMessage | undefined> {
     await Promise.resolve();
     const message = this.message;
+
+    if (quietHoursActive && !message?.bypassQuietHours) {
+      return undefined;
+    }
+
     this.message = undefined;
     return message;
   }
@@ -48,6 +53,7 @@ const baseMessage: QueueMessage = {
   },
   status: "processing",
   priority: 0,
+  bypassQuietHours: false,
   scheduledFor: new Date(),
   attempts: 1,
   createdAt: new Date(),
@@ -65,7 +71,8 @@ void test("QueueWorker marks a delivered message as sent", async () => {
       await Promise.resolve();
       sent.push(text);
     },
-    maxRetries: 3
+    maxRetries: 3,
+    now: () => new Date("2026-09-06T12:00:00")
   });
 
   const processed = await worker.processOne();
@@ -84,7 +91,8 @@ void test("QueueWorker reschedules failed messages while attempts remain", async
       throw new Error("not connected");
     },
     maxRetries: 3,
-    retryDelayMs: 10
+    retryDelayMs: 10,
+    now: () => new Date("2026-09-06T12:00:00")
   });
 
   await worker.processOne();
@@ -113,6 +121,25 @@ void test("QueueWorker does not claim or send anything during quiet hours", asyn
   assert.equal(repository.message, baseMessage);
 });
 
+void test("QueueWorker still sends a bypassQuietHours message during quiet hours", async () => {
+  const repository = new FakeRepository();
+  repository.message = { ...baseMessage, bypassQuietHours: true };
+  const sent: string[] = [];
+  const worker = new QueueWorker(repository, {
+    sender: async (_destination, text) => {
+      await Promise.resolve();
+      sent.push(text);
+    },
+    now: () => new Date("2026-09-06T03:00:00")
+  });
+
+  const processed = await worker.processOne();
+
+  assert.equal(processed, true);
+  assert.deepEqual(sent, ["Teste"]);
+  assert.deepEqual(repository.sent, [baseMessage.id]);
+});
+
 void test("QueueWorker marks message as failed when retry limit is reached", async () => {
   const repository = new FakeRepository();
   repository.message = { ...baseMessage, attempts: 3 };
@@ -121,7 +148,8 @@ void test("QueueWorker marks message as failed when retry limit is reached", asy
       await Promise.resolve();
       throw new Error("not connected");
     },
-    maxRetries: 3
+    maxRetries: 3,
+    now: () => new Date("2026-09-06T12:00:00")
   });
 
   await worker.processOne();

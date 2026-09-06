@@ -18,6 +18,7 @@ class FakeQueue implements QueueServiceLike {
       payload: input.payload,
       status: "pending",
       priority: input.priority ?? 0,
+      bypassQuietHours: input.bypassQuietHours ?? false,
       scheduledFor: input.scheduledFor ?? new Date(),
       attempts: 0,
       createdAt: new Date(),
@@ -62,6 +63,7 @@ void test("queues a welcome message mentioning every new participant", async () 
   const payload = queue.enqueued[0].payload as TextMessagePayload;
   assert.deepEqual(payload.mentions, ["5511999999999@s.whatsapp.net", "5521988888888@s.whatsapp.net"]);
   assert.match(payload.text, /@5511999999999/);
+  assert.equal(queue.enqueued[0].bypassQuietHours, true);
 });
 
 void test("queues an iconic goodbye message when a participant leaves", async () => {
@@ -74,6 +76,7 @@ void test("queues an iconic goodbye message when a participant leaves", async ()
   assert.equal(queue.enqueued[0].destinationGroup, networkingGroups[1]);
   const payload = queue.enqueued[0].payload as TextMessagePayload;
   assert.ok(payload.text.length > 0);
+  assert.equal(queue.enqueued[0].bypassQuietHours, true);
 });
 
 void test("ignores promote/demote/modify actions", async () => {

@@ -21,6 +21,7 @@ export const messageQueue = pgTable(
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
     status: messageQueueStatus("status").notNull().default("pending"),
     priority: integer("priority").notNull().default(0),
+    bypassQuietHours: boolean("bypass_quiet_hours").notNull().default(false),
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull().defaultNow(),
     attempts: integer("attempts").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

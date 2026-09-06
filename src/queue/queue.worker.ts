@@ -88,14 +88,10 @@ export class QueueWorker {
       return false;
     }
 
-    if (isQuietHours(this.now())) {
-      return false;
-    }
-
     this.running = true;
 
     try {
-      const message = await this.repository.claimNext();
+      const message = await this.repository.claimNext(this.now(), isQuietHours(this.now()));
       if (!message) {
         return false;
       }

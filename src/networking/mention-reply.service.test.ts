@@ -51,6 +51,7 @@ class FakeQueue implements QueueServiceLike {
       payload: input.payload,
       status: "pending",
       priority: input.priority ?? 0,
+      bypassQuietHours: input.bypassQuietHours ?? false,
       scheduledFor: input.scheduledFor ?? new Date(),
       attempts: 0,
       createdAt: new Date(),

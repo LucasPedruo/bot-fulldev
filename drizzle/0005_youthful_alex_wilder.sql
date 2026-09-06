@@ -1,0 +1,1 @@
+ALTER TABLE "message_queue" ADD COLUMN "bypass_quiet_hours" boolean DEFAULT false NOT NULL;

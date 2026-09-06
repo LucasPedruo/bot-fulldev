@@ -32,7 +32,10 @@ export function createNetworkingMembershipListener(
       await queue.enqueue({
         type: "networking",
         destinationGroup: update.id,
-        payload: { text, mentions }
+        payload: { text, mentions },
+        // Join/leave events are low-frequency and reactive, not spam-prone like idle topics or
+        // job posts, so the user asked for these specifically to skip the quiet-hours block.
+        bypassQuietHours: true
       });
       logger.info({ groupJid: update.id, participantJids }, "Networking welcome message queued");
       return;
@@ -42,7 +45,8 @@ export function createNetworkingMembershipListener(
       await queue.enqueue({
         type: "networking",
         destinationGroup: update.id,
-        payload: { text: pickGoodbyeMessage() }
+        payload: { text: pickGoodbyeMessage() },
+        bypassQuietHours: true
       });
       logger.info({ groupJid: update.id }, "Networking goodbye message queued");
     }

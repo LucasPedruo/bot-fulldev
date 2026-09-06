@@ -30,6 +30,7 @@ export class QueueRepository {
         destinationGroup: input.destinationGroup,
         payload: input.payload,
         priority: input.priority ?? 0,
+        bypassQuietHours: input.bypassQuietHours ?? false,
         scheduledFor: input.scheduledFor ?? new Date()
       })
       .returning();
@@ -37,7 +38,11 @@ export class QueueRepository {
     return toQueueMessage(message);
   }
 
-  async claimNext(now = new Date()): Promise<QueueMessage | undefined> {
+  async claimNext(now = new Date(), quietHoursActive = false): Promise<QueueMessage | undefined> {
+    const eligible = quietHoursActive
+      ? and(eq(messageQueue.status, "pending"), lte(messageQueue.scheduledFor, now), eq(messageQueue.bypassQuietHours, true))
+      : and(eq(messageQueue.status, "pending"), lte(messageQueue.scheduledFor, now));
+
     const [message] = await db
       .update(messageQueue)
       .set({
@@ -52,7 +57,7 @@ export class QueueRepository {
           db
             .select({ id: messageQueue.id })
             .from(messageQueue)
-            .where(and(eq(messageQueue.status, "pending"), lte(messageQueue.scheduledFor, now)))
+            .where(eligible)
             .orderBy(asc(messageQueue.priority), asc(messageQueue.scheduledFor), asc(messageQueue.createdAt))
             .limit(1)
         )
