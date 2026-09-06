@@ -3,6 +3,7 @@ import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
 import { pickMentionCooldownMessage, pickMentionReply } from "./idle-content.js";
+import { generateMentionReply } from "./mention-ai.provider.js";
 import { NetworkingRepository } from "./networking.repository.js";
 
 export type MentionRepositoryLike = Pick<
@@ -12,15 +13,17 @@ export type MentionRepositoryLike = Pick<
 export type QueueServiceLike = {
   enqueue(input: Parameters<typeof queueService.enqueue>[0]): Promise<QueueMessage>;
 };
+export type MentionReplyGenerator = (messageText?: string) => Promise<string | undefined>;
 
 export class MentionReplyService {
   constructor(
     private readonly repository: MentionRepositoryLike = new NetworkingRepository(),
     private readonly queue: QueueServiceLike = queueService,
-    private readonly now: () => Date = () => new Date()
+    private readonly now: () => Date = () => new Date(),
+    private readonly aiReplyGenerator: MentionReplyGenerator | undefined = env.MENTION_REPLY_AI_ENABLED ? generateMentionReply : undefined
   ) {}
 
-  async handleMention(groupJid: string, senderJid: string): Promise<void> {
+  async handleMention(groupJid: string, senderJid: string, messageText?: string): Promise<void> {
     const muteUntil = await this.repository.getMentionMuteUntil(groupJid);
     if (muteUntil && muteUntil.getTime() > this.now().getTime()) {
       return;
@@ -28,9 +31,20 @@ export class MentionReplyService {
 
     const since = new Date(this.now().getTime() - 60 * 60_000);
     const recentCount = await this.repository.countRecentMentionReplies(groupJid, since);
-    const text = recentCount >= env.NETWORKING_MENTION_MAX_PER_HOUR ? await this.triggerCooldown(groupJid) : pickMentionReply();
+    const text = recentCount >= env.NETWORKING_MENTION_MAX_PER_HOUR ? await this.triggerCooldown(groupJid) : await this.pickReply(messageText);
 
     await this.reply(groupJid, senderJid, text);
+  }
+
+  private async pickReply(messageText?: string): Promise<string> {
+    if (this.aiReplyGenerator) {
+      const aiText = await this.aiReplyGenerator(messageText);
+      if (aiText) {
+        return aiText;
+      }
+    }
+
+    return pickMentionReply();
   }
 
   private async triggerCooldown(groupJid: string): Promise<string> {

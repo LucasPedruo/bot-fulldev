@@ -114,3 +114,47 @@ void test("expired mute does not block a reply", async () => {
 
   assert.equal(queue.enqueued.length, 1);
 });
+
+void test("uses the AI-generated reply when the generator returns text", async () => {
+  const repository = new FakeRepository(undefined, 0);
+  const queue = new FakeQueue();
+  const service = new MentionReplyService(repository, queue, () => fixedNow, async (messageText) => {
+    await Promise.resolve();
+    return `IA respondeu sobre: ${messageText ?? "nada"}`;
+  });
+
+  await service.handleMention(group, sender, "qual editor vocês usam?");
+
+  const payload = queue.enqueued[0].payload as TextMessagePayload;
+  assert.match(payload.text, /IA respondeu sobre: qual editor vocês usam\?/);
+});
+
+void test("falls back to the template reply when the AI generator returns nothing", async () => {
+  const repository = new FakeRepository(undefined, 0);
+  const queue = new FakeQueue();
+  const service = new MentionReplyService(repository, queue, () => fixedNow, async () => {
+    await Promise.resolve();
+    return undefined;
+  });
+
+  await service.handleMention(group, sender);
+
+  assert.equal(queue.enqueued.length, 1);
+  const payload = queue.enqueued[0].payload as TextMessagePayload;
+  assert.ok(payload.text.length > 0);
+});
+
+void test("never calls the AI generator once the hourly limit is reached", async () => {
+  const repository = new FakeRepository(undefined, env.NETWORKING_MENTION_MAX_PER_HOUR);
+  const queue = new FakeQueue();
+  const service = new MentionReplyService(repository, queue, () => fixedNow, async () => {
+    await Promise.resolve();
+    throw new Error("AI generator should not be called during cooldown");
+  });
+
+  await service.handleMention(group, sender);
+
+  assert.equal(queue.enqueued.length, 1);
+  const payload = queue.enqueued[0].payload as TextMessagePayload;
+  assert.match(payload.text, new RegExp(`${env.NETWORKING_MENTION_COOLDOWN_HOURS}h`));
+});

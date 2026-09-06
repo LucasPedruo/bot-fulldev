@@ -294,7 +294,7 @@ Hoje só as mensagens de entrada/saida de grupo (`src/networking/membership-list
 Os 2 grupos de Networking configurados tem automacoes reativas:
 
 - **Ociosidade**: se um grupo ficar `NETWORKING_IDLE_THRESHOLD_MINUTES` (padrao 120, ou seja 2h) sem nenhuma mensagem, o bot puxa assunto — piada, critica de linguagem, enquete (poll nativo do WhatsApp), ocasionalmente uma noticia real de tech via [Dev.to API](https://developers.forem.com/api) (`GET https://dev.to/api/articles?top=1`, publica, sem chave), ou uma **pergunta direta marcando um participante real** do grupo (sorteado via `WhatsAppConnectionManager.listParticipants`, excluindo o proprio bot) — assim nem toda mensagem de ociosidade e uma pergunta solta no vazio. Verificado a cada `NETWORKING_IDLE_CHECK_INTERVAL_MINUTES` (padrao 10) via `NetworkingIdleScheduler` (`src/scheduler/networking-idle.scheduler.ts`).
-- **Mencao**: se alguem mencionar o bot com `@` num desses grupos, ele responde com uma besteira e menciona a pessoa de volta — com limite (veja abaixo).
+- **Mencao**: se alguem mencionar o bot com `@` num desses grupos, ele responde com uma besteira e menciona a pessoa de volta — com limite (veja abaixo). Opcionalmente com IA de verdade (veja "Resposta de mencao com IA" abaixo).
 - **Entrada/saida**: quem entra num grupo de Networking recebe boas-vindas mencionando a pessoa ("seita secreta", ler as regras); quem sai leva uma mensagem iconica de despedida (HB20, Vasco, etc.), sem mencao.
 
 Conteudo gerado por **templates com partes variaveis** (linguagem/framework/tema sorteados), sem IA generativa — decisao explicita para nao gastar token. `src/networking/idle-content.ts` guarda todos os moldes (topicos, mencoes, boas-vindas, despedidas). `NetworkingRepository` (`group_activity`, `networking_topic_history`, `mention_reply_log`) evita repetir os ultimos usados por grupo e guarda o timestamp da ultima atividade real (atualizado por um listener de `messages.upsert` no Baileys, que hoje nao existia) e o estado de limite de mencoes.
@@ -316,6 +316,20 @@ NETWORKING_IDLE_CHECK_INTERVAL_MINUTES=10
 NETWORKING_MENTION_MAX_PER_HOUR=5
 NETWORKING_MENTION_COOLDOWN_HOURS=2
 ```
+
+### Resposta de mencao com IA
+
+As respostas de mencao continuam por template por padrao (`pickMentionReply`), mas podem opcionalmente usar uma IA de verdade via [Groq](https://console.groq.com) — API gratuita e compativel com o formato da OpenAI (`chat/completions`), sem cartao de credito, com limite de taxa (~30 req/min) muito acima do que essa feature usa (no maximo `NETWORKING_MENTION_MAX_PER_HOUR` por grupo). Comparado com o free tier do Gemini, cuja politica publica diz que humanos podem revisar/usar o conteudo pra treinar o modelo, o Groq (hospeda modelos abertos, nao treina os proprios) nao documenta essa pratica — mais adequado pra conteudo de um grupo real. OpenAI nao tem free tier de API (so o ChatGPT web e gratis, a API cobra desde o primeiro request).
+
+`MentionAiProvider` (`src/networking/mention-ai.provider.ts`) manda o texto de quem mencionou o bot como contexto (`buildMentionPrompt`) com um system prompt fixando o tom (engraçado, autodepreciativo, PT-BR, uma frase curta). Qualquer falha (sem chave configurada, timeout de 10s, rate limit, resposta vazia) cai automaticamente pro template normal — nunca trava nem derruba a resposta.
+
+```env
+MENTION_REPLY_AI_ENABLED=false
+GROQ_API_KEY=
+GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+Pra ativar: crie uma chave gratuita em [console.groq.com](https://console.groq.com/keys), coloque em `GROQ_API_KEY` e mude `MENTION_REPLY_AI_ENABLED` pra `true`.
 
 ## Networking programado
 
@@ -372,7 +386,7 @@ GET https://raw.githubusercontent.com/agenda-tech-brasil/agenda-tech-brasil/main
 
 Ignora anos/meses ja arquivados e qualquer evento cuja data ja passou, monta um ID sintetico estavel (a fonte nao tem ID proprio) e mapeia presencial/online/hibrido. Eventos "a definir" (sem data) so recebem a notificacao de novo evento, nunca lembrete.
 
-**Luma** (`src/events/providers/luma.provider.ts`, `LUMA_EVENTS_ENABLED`, desativado por padrao) — faz parse do `__NEXT_DATA__` (JSON embutido no HTML da pagina Next.js) das paginas de descoberta por cidade `luma.com/saopaulo` e `luma.com/rio` (unicos slugs de cidade brasileira confirmados; outros redirecionam pra uma pagina generica). O feed por cidade mistura todo tipo de evento (moda, financas, tech), entao um filtro de palavras-chave (`isTechEventTitle`, em `event.normalizer.ts`) descarta o que nao parece ser de tecnologia — best-effort, alguns eventos tech com nome muito abstrato podem passar despercebidos. **So dados do proprio evento sao extraidos (nome/data/local/link) — o payload da Luma tambem traz dados pessoais de anfitrioes e convidados confirmados (nome, foto, redes sociais) ao lado de cada evento, e essas chaves nunca sao lidas nem repassadas.**
+**Luma** (`src/events/providers/luma.provider.ts`, `LUMA_EVENTS_ENABLED`, desativado por padrao) — faz parse do `__NEXT_DATA__` (JSON embutido no HTML da pagina Next.js) das paginas de descoberta por cidade `luma.com/saopaulo` e `luma.com/rio`. **Cobertura de São Paulo/Rio apenas - limitação da propria plataforma Luma, nao do scraper**: confirmado ao vivo que essas sao as unicas 2 cidades brasileiras com pagina de descoberta propria no Luma (testado `/brasilia`, `/salvador`, `/recife`, `/curitiba`, `/belohorizonte`, `/fortaleza`, etc - nenhuma existe; tambem nao ha pagina de pais tipo `/brazil` nem busca publica por local). Cobertura nacional de verdade ja vem do AgendaTechBrasil e do EventostiDev, que nao tem nenhum recorte de cidade. O feed por cidade mistura todo tipo de evento (moda, financas, tech), entao um filtro de palavras-chave (`isTechEventTitle`, em `event.normalizer.ts`) descarta o que nao parece ser de tecnologia — best-effort, alguns eventos tech com nome muito abstrato podem passar despercebidos. **So dados do proprio evento sao extraidos (nome/data/local/link) — o payload da Luma tambem traz dados pessoais de anfitrioes e convidados confirmados (nome, foto, redes sociais) ao lado de cada evento, e essas chaves nunca sao lidas nem repassadas.**
 
 **EventostiDev** (`src/events/providers/eventosti-dev.provider.ts`, `EVENTOSTI_DEV_EVENTS_ENABLED`, desativado por padrao) — faz parse (via `cheerio`) dos cards da secao "Proximos Eventos" de `eventosti.dev`, um agregador exclusivamente de tecnologia (sem filtro de tema necessario, mesmo caso do AgendaTechBrasil). Volume baixo (poucos eventos cadastrados por vez).
 

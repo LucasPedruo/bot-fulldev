@@ -57,6 +57,7 @@ export function createNetworkingMessageListener(
       return;
     }
 
-    await mentionService.handleMention(remoteJid, senderJid);
+    const messageText = message.message?.conversation ?? message.message?.extendedTextMessage?.text ?? undefined;
+    await mentionService.handleMention(remoteJid, senderJid, messageText);
   };
 }

@@ -22,11 +22,11 @@ class FakeRepository implements NetworkingRepositoryLike {
 }
 
 class FakeMentionService implements MentionReplyServiceLike {
-  public handled: Array<{ groupJid: string; senderJid: string }> = [];
+  public handled: Array<{ groupJid: string; senderJid: string; messageText?: string }> = [];
 
-  async handleMention(groupJid: string, senderJid: string): Promise<void> {
+  async handleMention(groupJid: string, senderJid: string, messageText?: string): Promise<void> {
     await Promise.resolve();
-    this.handled.push({ groupJid, senderJid });
+    this.handled.push({ groupJid, senderJid, messageText });
   }
 }
 
@@ -35,6 +35,7 @@ function buildMessage(input: {
   fromMe?: boolean;
   participant?: string;
   mentionedJid?: string[];
+  text?: string;
 }): WAMessage {
   return {
     key: {
@@ -45,11 +46,11 @@ function buildMessage(input: {
     message: input.mentionedJid
       ? {
           extendedTextMessage: {
-            text: "oi @bot",
+            text: input.text ?? "oi @bot",
             contextInfo: { mentionedJid: input.mentionedJid }
           }
         }
-      : { conversation: "oi gente" }
+      : { conversation: input.text ?? "oi gente" }
   };
 }
 
@@ -89,7 +90,9 @@ void test("delegates to the mention service when the bot is mentioned in a netwo
   );
 
   assert.deepEqual(repository.touched, [networkingGroups[0]]);
-  assert.deepEqual(mentionService.handled, [{ groupJid: networkingGroups[0], senderJid: "5511999999999@s.whatsapp.net" }]);
+  assert.deepEqual(mentionService.handled, [
+    { groupJid: networkingGroups[0], senderJid: "5511999999999@s.whatsapp.net", messageText: "oi @bot" }
+  ]);
 });
 
 void test("recognizes a mention that uses the bot's LID instead of its phone-number JID", async () => {
@@ -105,7 +108,28 @@ void test("recognizes a mention that uses the bot's LID instead of its phone-num
     })
   );
 
-  assert.deepEqual(mentionService.handled, [{ groupJid: networkingGroups[0], senderJid: "162783622594588@lid" }]);
+  assert.deepEqual(mentionService.handled, [
+    { groupJid: networkingGroups[0], senderJid: "162783622594588@lid", messageText: "oi @bot" }
+  ]);
+});
+
+void test("passes the actual mention message text through to the mention service", async () => {
+  const repository = new FakeRepository();
+  const mentionService = new FakeMentionService();
+  const listener = createNetworkingMessageListener({ getBotJids, networkingGroups, repository, mentionService });
+
+  await listener(
+    buildMessage({
+      remoteJid: networkingGroups[0],
+      participant: "5511999999999@s.whatsapp.net",
+      mentionedJid: ["551100000000@s.whatsapp.net"],
+      text: "qual editor vocês usam?"
+    })
+  );
+
+  assert.deepEqual(mentionService.handled, [
+    { groupJid: networkingGroups[0], senderJid: "5511999999999@s.whatsapp.net", messageText: "qual editor vocês usam?" }
+  ]);
 });
 
 void test("does not delegate for its own messages even if they technically mention it", async () => {
