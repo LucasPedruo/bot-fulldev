@@ -1,7 +1,7 @@
 export const messageQueueStatuses = ["pending", "processing", "sent", "failed", "cancelled"] as const;
 export type MessageQueueStatus = (typeof messageQueueStatuses)[number];
 
-export const messageQueueTypes = ["manual", "job", "event", "event_reminder", "networking"] as const;
+export const messageQueueTypes = ["manual", "job", "event", "event_reminder", "event_promo", "networking"] as const;
 export type MessageQueueType = (typeof messageQueueTypes)[number];
 
 export type TextMessagePayload = {
@@ -26,7 +26,18 @@ export type ImageMessagePayload = {
   };
 };
 
-export type MessagePayload = TextMessagePayload | PollMessagePayload | ImageMessagePayload;
+export type EventCreationMessagePayload = {
+  eventCreation: {
+    name: string;
+    description?: string;
+    // ISO strings, not Date - the payload is stored as JSON, so the sender reconstructs Date
+    // objects right before calling Baileys.
+    startDateIso: string;
+    endDateIso?: string;
+  };
+};
+
+export type MessagePayload = TextMessagePayload | PollMessagePayload | ImageMessagePayload | EventCreationMessagePayload;
 
 export type QueueMessage = {
   id: string;

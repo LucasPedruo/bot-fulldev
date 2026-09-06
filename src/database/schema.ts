@@ -10,7 +10,7 @@ export const appMetadata = pgTable("app_metadata", {
 
 export const messageQueueStatus = pgEnum("message_queue_status", ["pending", "processing", "sent", "failed", "cancelled"]);
 
-export const messageQueueType = pgEnum("message_queue_type", ["manual", "job", "event", "event_reminder", "networking"]);
+export const messageQueueType = pgEnum("message_queue_type", ["manual", "job", "event", "event_reminder", "event_promo", "networking"]);
 
 export const messageQueue = pgTable(
   "message_queue",
@@ -176,7 +176,8 @@ export const eventNotificationType = pgEnum("event_notification_type", [
   "event_7_days",
   "event_3_days",
   "event_tomorrow",
-  "event_today"
+  "event_today",
+  "event_promo"
 ]);
 
 export const eventNotifications = pgTable(

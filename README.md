@@ -293,7 +293,7 @@ Hoje só as mensagens de entrada/saida de grupo (`src/networking/membership-list
 
 Os 2 grupos de Networking configurados tem automacoes reativas:
 
-- **Ociosidade**: se um grupo ficar `NETWORKING_IDLE_THRESHOLD_MINUTES` (padrao 60) sem nenhuma mensagem, o bot puxa assunto — piada, critica de linguagem, enquete (poll nativo do WhatsApp) ou, ocasionalmente, uma noticia real de tech via [Dev.to API](https://developers.forem.com/api) (`GET https://dev.to/api/articles?top=1`, publica, sem chave). Verificado a cada `NETWORKING_IDLE_CHECK_INTERVAL_MINUTES` (padrao 10) via `NetworkingIdleScheduler` (`src/scheduler/networking-idle.scheduler.ts`).
+- **Ociosidade**: se um grupo ficar `NETWORKING_IDLE_THRESHOLD_MINUTES` (padrao 120, ou seja 2h) sem nenhuma mensagem, o bot puxa assunto — piada, critica de linguagem, enquete (poll nativo do WhatsApp), ocasionalmente uma noticia real de tech via [Dev.to API](https://developers.forem.com/api) (`GET https://dev.to/api/articles?top=1`, publica, sem chave), ou uma **pergunta direta marcando um participante real** do grupo (sorteado via `WhatsAppConnectionManager.listParticipants`, excluindo o proprio bot) — assim nem toda mensagem de ociosidade e uma pergunta solta no vazio. Verificado a cada `NETWORKING_IDLE_CHECK_INTERVAL_MINUTES` (padrao 10) via `NetworkingIdleScheduler` (`src/scheduler/networking-idle.scheduler.ts`).
 - **Mencao**: se alguem mencionar o bot com `@` num desses grupos, ele responde com uma besteira e menciona a pessoa de volta — com limite (veja abaixo).
 - **Entrada/saida**: quem entra num grupo de Networking recebe boas-vindas mencionando a pessoa ("seita secreta", ler as regras); quem sai leva uma mensagem iconica de despedida (HB20, Vasco, etc.), sem mencao.
 
@@ -311,7 +311,7 @@ Desligado por padrao (`NETWORKING_IDLE_ENABLED=false`) — a mesma flag liga oci
 QUIET_HOURS_START=00:00
 QUIET_HOURS_END=07:00
 NETWORKING_IDLE_ENABLED=false
-NETWORKING_IDLE_THRESHOLD_MINUTES=60
+NETWORKING_IDLE_THRESHOLD_MINUTES=120
 NETWORKING_IDLE_CHECK_INTERVAL_MINUTES=10
 NETWORKING_MENTION_MAX_PER_HOUR=5
 NETWORKING_MENTION_COOLDOWN_HOURS=2
@@ -332,7 +332,7 @@ NETWORKING_SCHEDULED_ENABLED=false
 
 ## Estatisticas
 
-Os numeros pedidos (vagas descobertas/enviadas, eventos descobertos/enviados, lembretes de evento enviados, mensagens de networking enviadas, mensagens com falha) sao calculados a partir de mensagens **realmente enviadas/falhadas na fila** (`StatsService`, `src/stats/stats.service.ts`) — nao e estimativa. Por escolha do usuario, esses numeros nao tem endpoint nem comando CLI proprio: eles aparecem automaticamente dentro do resumo diario das 18h descrito acima. Antes do Eventos existir, os numeros de evento ficavam sempre zerados; agora refletem dados reais sem nenhuma mudanca de codigo, porque o servico ja lia de um contador generico por tipo de mensagem.
+Os numeros pedidos (vagas descobertas/enviadas, eventos descobertos/enviados, lembretes de evento enviados, mensagens de networking enviadas, mensagens com falha) sao calculados a partir de mensagens **realmente enviadas/falhadas na fila** (`StatsService`, `src/stats/stats.service.ts`) — nao e estimativa. Por escolha do usuario, esses numeros nao tem endpoint nem comando CLI proprio: eles aparecem automaticamente dentro do resumo diario das 18h descrito acima.
 
 ## Memes
 
@@ -378,13 +378,20 @@ Ignora anos/meses ja arquivados e qualquer evento cuja data ja passou, monta um 
 
 Sympla foi descartado como fonte de scraping: alem da mesma restricao de API do organizador, as paginas de evento usam React Server Components em streaming (sem `__NEXT_DATA__` ou JSON estavel), tornando o parsing impraticavel.
 
+**So divulga o mes atual.** Um evento descoberto para um mes futuro fica salvo no banco (dedup normal, conta pro `EVENTS_MAX_PER_DAY`), mas so gera a mensagem de "Novo evento" quando `startDate` cai no mes corrente (comparado contra `America/Sao_Paulo`) — ou imediatamente, se for um evento "a definir" (sem data). Ele nao fica esquecido: continua existindo pros lembretes/promocao abaixo e pras perguntas no grupo, so nao e anunciado assim que descoberto (`isInCurrentMonth`, `event.normalizer.ts`).
+
 Lembretes automaticos em 7 dias, 3 dias, 1 dia (amanha) e no dia do evento, uma vez por tipo por evento (nunca reenvia, controlado pela tabela `event_notifications`), comparando a data do evento (guardada em UTC) contra o dia civil em `America/Sao_Paulo`, as `EVENT_REMINDER_TIME` (padrao 09:00) via `EventRemindersScheduler`.
+
+**Promocao 5 dias antes**: `EventPromoScheduler` (`src/scheduler/event-promo.scheduler.ts`, horario `EVENT_PROMO_TIME`, padrao 10:00) cria, uma vez por evento, um **Evento nativo do WhatsApp** (`{event: {...}}`, suportado pelo Baileys), uma **enquete nativa** ("Vai participar de X? Sim/Nao/Talvez") e uma mensagem marcando todo mundo do grupo perguntando quem vai — tudo isso 5 dias antes da data, entre os lembretes de 7 e 3 dias (`EventService.sendPromotions`, tipo de fila `event_promo`, notificacao `event_promo` — mesma logica de "so uma vez" dos lembretes).
+
+**Perguntar sobre eventos**: qualquer mensagem no grupo de Eventos que pareca uma pergunta sobre evento — por mes ("tem evento em outubro?") e/ou localidade ("tem evento em Recife?") — recebe resposta automatica com o que ja esta no banco, **sem precisar marcar o bot** (`src/events/event-query.ts` faz o parsing best-effort do texto; `EventQnaService` consulta `EventRepository.query()`). Uma pergunta genérica sem mes/local ("tem evento?") lista os proximos eventos cadastrados.
 
 ```env
 EVENTS_POLL_INTERVAL_MINUTES=15
 EVENTS_POLL_ENABLED=false
 EVENTS_MAX_PER_DAY=10
 EVENT_REMINDER_TIME=09:00
+EVENT_PROMO_TIME=10:00
 AGENDA_TECH_BRASIL_EVENTS_ENABLED=true
 LUMA_EVENTS_ENABLED=false
 EVENTOSTI_DEV_EVENTS_ENABLED=false
@@ -396,6 +403,14 @@ Validar sem salvar/enfileirar (por padrao usa o AgendaTechBrasil; `--provider=lu
 npm run events:poll -- --dry-run
 npm run events:poll -- --dry-run --provider=luma
 npm run events:poll -- --dry-run --provider=eventostidev
+```
+
+## Descricao do grupo
+
+Com o bot como administrador, ele pode editar a descricao de um grupo (`WhatsAppConnectionManager.updateGroupDescription`, usa `groupUpdateDescription` do Baileys). E uma acao pontual, nao automatica — roda manualmente via CLI:
+
+```bash
+npm run whatsapp:update-group-description -- <group-jid> "texto da descricao"
 ```
 
 ## Endpoints

@@ -7,7 +7,8 @@ export const eventNotificationTypes = [
   "event_7_days",
   "event_3_days",
   "event_tomorrow",
-  "event_today"
+  "event_today",
+  "event_promo"
 ] as const;
 export type EventNotificationType = (typeof eventNotificationTypes)[number];
 

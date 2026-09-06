@@ -107,6 +107,21 @@ const welcomeTemplates: Array<(tags: string) => string> = [
   (tags) => `${tags}, parabéns, você foi selecionado(a) para a seita secreta de devs. Leia as regras antes que seja tarde demais.`
 ];
 
+const directQuestionTemplates: Array<(tag: string) => string> = [
+  (tag) => `${tag}, qual foi a maior dor de cabeça técnica da sua semana?`,
+  (tag) => `${tag}, qual é o teu stack do dia a dia?`,
+  (tag) => `${tag}, o que você tá estudando/aprendendo agora?`,
+  (tag) => `${tag}, qual foi o bug mais bizarro que você já resolveu?`,
+  (tag) => `${tag}, projeto pessoal ou só trampo mesmo? Conta aí.`,
+  (tag) => `${tag}, editor de código ou IDE? E por quê?`,
+  (tag) => `${tag}, qual ferramenta você não vive sem no trabalho?`
+];
+
+export function pickDirectQuestion(participantJid: string): { text: string; mentions: string[] } {
+  const tag = `@${participantJid.split("@")[0]}`;
+  return { text: pickOne(directQuestionTemplates)(tag), mentions: [participantJid] };
+}
+
 export function buildWelcomeMessage(participantJids: string[]): { text: string; mentions: string[] } {
   const tags = participantJids.map((jid) => `@${jid.split("@")[0]}`).join(" ");
   return { text: pickOne(welcomeTemplates)(tags), mentions: participantJids };

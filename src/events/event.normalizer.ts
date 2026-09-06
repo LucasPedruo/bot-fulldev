@@ -14,6 +14,28 @@ export function isTechEventTitle(title: string): boolean {
   return techEventKeywords.test(normalizePart(title));
 }
 
+// Shared across providers that use PT-BR month names (AgendaTechBrasil's own field) and the
+// events Q&A feature (parsing a month name out of a free-text question).
+export const monthIndexByName: Record<string, number> = {
+  janeiro: 0,
+  fevereiro: 1,
+  março: 2,
+  marco: 2,
+  abril: 3,
+  maio: 4,
+  junho: 5,
+  julho: 6,
+  agosto: 7,
+  setembro: 8,
+  outubro: 9,
+  novembro: 10,
+  dezembro: 11
+};
+
+export function isInCurrentMonth(date: Date, now: Date): boolean {
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+}
+
 export function createEventFingerprint(input: { title: string; url: string; startDate?: Date }): string {
   const normalized = [normalizePart(input.title), normalizePart(input.url), input.startDate?.toISOString() ?? "tba"].join("|");
   return createHash("sha256").update(normalized).digest("hex");
@@ -28,7 +50,7 @@ export function slugify(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-function normalizePart(value: string): string {
+export function normalizePart(value: string): string {
   return value
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")

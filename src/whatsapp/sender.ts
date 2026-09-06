@@ -21,3 +21,13 @@ export async function sendImageMessage(destinationJid: string, filename: string,
   const image = await readFile(filePath);
   await whatsapp.sendImage(destinationJid, image, caption);
 }
+
+export async function sendEventMessage(
+  destinationJid: string,
+  name: string,
+  description: string | undefined,
+  startDateIso: string,
+  endDateIso?: string
+): Promise<void> {
+  await whatsapp.sendEvent(destinationJid, name, description, new Date(startDateIso), endDateIso ? new Date(endDateIso) : undefined);
+}

@@ -1,9 +1,12 @@
+import { jidNormalizedUser } from "@whiskeysockets/baileys";
 import { env } from "../config/env.js";
 import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
+import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
-import { formatEventReminderMessage, formatNewEventMessage } from "./event.formatter.js";
+import { formatEventPromoDescription, formatEventReminderMessage, formatNewEventMessage } from "./event.formatter.js";
+import { isInCurrentMonth } from "./event.normalizer.js";
 import { EventRepository } from "./event.repository.js";
 import type { EventNotificationType, NormalizedEvent, PersistedEvent } from "./event.types.js";
 import { AgendaTechBrasilProvider } from "./providers/agenda-tech-brasil.provider.js";
@@ -27,6 +30,8 @@ export type QueueServiceLike = {
   enqueue(input: Parameters<typeof queueService.enqueue>[0]): Promise<QueueMessage>;
 };
 
+const PROMO_DAYS_BEFORE = 5;
+
 const reminderOffsets: Array<{ type: EventNotificationType; days: number }> = [
   { type: "event_7_days", days: 7 },
   { type: "event_3_days", days: 3 },
@@ -39,7 +44,12 @@ export class EventService {
     private readonly providers: EventProvider[] = createDefaultProviders(),
     private readonly repository: EventRepositoryLike = new EventRepository(),
     private readonly queue: QueueServiceLike = queueService,
-    private readonly now: () => Date = () => new Date()
+    private readonly now: () => Date = () => new Date(),
+    private readonly listParticipants: (groupJid: string) => Promise<string[]> = (groupJid) => whatsapp.listParticipants(groupJid),
+    private readonly getBotJids: () => string[] = () => {
+      const user = whatsapp.getSocket()?.user;
+      return [user?.id, user?.lid].filter((jid): jid is string => Boolean(jid));
+    }
   ) {}
 
   async poll(): Promise<EventsPollResult> {
@@ -81,7 +91,13 @@ export class EventService {
 
       const persisted = await this.repository.insert(event);
       discovered += 1;
-      queued += await this.notifyNewEvent(persisted);
+
+      // Only announce events happening this month (or TBA ones, which have no month to wait for) -
+      // a far-future event stays quietly in the database and surfaces later via reminders/promo as
+      // its date approaches, instead of flooding the group the moment it's discovered.
+      if (!event.startDate || isInCurrentMonth(event.startDate, this.now())) {
+        queued += await this.notifyNewEvent(persisted);
+      }
     }
 
     logger.info({ fetched: fetchedEvents.length, discovered, queued, skippedDuplicates, providerFailures }, "New events discovered");
@@ -121,6 +137,84 @@ export class EventService {
 
     logger.info({ sent }, "Event reminders sent");
     return { sent };
+  }
+
+  // Runs once a day, independent of the 7/3/1/day-of reminders: 5 days out, turn the event into a
+  // native WhatsApp Event + a "vai participar?" poll + a text mentioning everyone, so the group gets
+  // one clear moment to RSVP instead of just reading another reminder line.
+  async sendPromotions(): Promise<{ sent: number }> {
+    const destinationGroup = getConfiguredWhatsAppGroups().eventsGroup;
+    if (!destinationGroup) {
+      return { sent: 0 };
+    }
+
+    const targetDate = new Date(this.now());
+    targetDate.setDate(targetDate.getDate() + PROMO_DAYS_BEFORE);
+
+    const events = await this.repository.findEventsStartingOn(targetDate);
+    let sent = 0;
+
+    for (const event of events) {
+      // findEventsStartingOn only ever returns events with a real startDate, but the type is
+      // still optional (TBA events share the same PersistedEvent shape) - guard defensively.
+      if (!event.startDate) {
+        continue;
+      }
+
+      const created = await this.repository.recordNotification(event.id, "event_promo");
+      if (!created) {
+        continue;
+      }
+
+      await this.queue.enqueue({
+        type: "event_promo",
+        destinationGroup,
+        payload: {
+          eventCreation: {
+            name: event.title,
+            description: formatEventPromoDescription(event),
+            startDateIso: event.startDate.toISOString()
+          }
+        }
+      });
+
+      await this.queue.enqueue({
+        type: "event_promo",
+        destinationGroup,
+        payload: { poll: { name: `Vai participar de ${event.title}?`, values: ["Sim", "Não", "Talvez"] } }
+      });
+
+      const mentionText = await this.buildMentionAllText(destinationGroup, event.title);
+      if (mentionText) {
+        await this.queue.enqueue({ type: "event_promo", destinationGroup, payload: mentionText });
+      }
+
+      sent += 1;
+    }
+
+    logger.info({ sent }, "Event promotions sent");
+    return { sent };
+  }
+
+  private async buildMentionAllText(groupJid: string, eventTitle: string): Promise<{ text: string; mentions: string[] } | undefined> {
+    let participants: string[];
+
+    try {
+      participants = await this.listParticipants(groupJid);
+    } catch (error) {
+      logger.error({ groupJid, err: error }, "Failed to list participants for event promotion");
+      return undefined;
+    }
+
+    const normalizedBotJids = new Set(this.getBotJids().map(jidNormalizedUser));
+    const eligible = participants.filter((jid) => !normalizedBotJids.has(jidNormalizedUser(jid)));
+
+    if (eligible.length === 0) {
+      return undefined;
+    }
+
+    const tags = eligible.map((jid) => `@${jid.split("@")[0]}`).join(" ");
+    return { text: `Quem vai em "${eventTitle}"? Responde na enquete acima! ${tags}`, mentions: eligible };
   }
 
   private async notifyNewEvent(event: PersistedEvent): Promise<number> {

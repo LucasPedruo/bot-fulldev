@@ -76,6 +76,7 @@ const envSchema = z.object({
   EVENTS_POLL_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
   EVENTS_MAX_PER_DAY: z.coerce.number().int().positive().default(10),
   EVENT_REMINDER_TIME: timeSchema.default("09:00"),
+  EVENT_PROMO_TIME: timeSchema.default("10:00"),
   AGENDA_TECH_BRASIL_EVENTS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(true),
   LUMA_EVENTS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
   EVENTOSTI_DEV_EVENTS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),

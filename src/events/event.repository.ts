@@ -1,9 +1,16 @@
-import { and, eq, gte, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, lt, or, sql } from "drizzle-orm";
 import { db } from "../database/client.js";
 import { eventNotifications, events } from "../database/schema.js";
 import type { EventNotificationType, NormalizedEvent, PersistedEvent } from "./event.types.js";
 
 type EventRow = typeof events.$inferSelect;
+
+export type EventQueryFilter = {
+  month?: number;
+  year?: number;
+  locationContains?: string;
+  limit?: number;
+};
 
 export class EventRepository {
   async findDuplicate(event: NormalizedEvent): Promise<PersistedEvent | undefined> {
@@ -66,6 +73,30 @@ export class EventRepository {
 
     return Boolean(row);
   }
+
+  // Backs the events Q&A feature: answers "tem evento em <mes/local>?" against what's actually
+  // stored. With no month/location given, falls back to the next upcoming events overall.
+  async query(filter: EventQueryFilter): Promise<PersistedEvent[]> {
+    const conditions = [];
+
+    if (filter.month !== undefined && filter.year !== undefined) {
+      const { start, end } = localMonthRange(filter.year, filter.month);
+      conditions.push(and(gte(events.startDate, start), lt(events.startDate, end)));
+    }
+
+    if (filter.locationContains) {
+      conditions.push(ilike(events.location, `%${filter.locationContains}%`));
+    }
+
+    const rows = await db
+      .select()
+      .from(events)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(asc(events.startDate))
+      .limit(filter.limit ?? 5);
+
+    return rows.map(toPersistedEvent);
+  }
 }
 
 export const eventRepository = new EventRepository();
@@ -88,5 +119,11 @@ function toPersistedEvent(row: EventRow): PersistedEvent {
 function localDayRange(date: Date): { start: Date; end: Date } {
   const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
   const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, 0, 0, 0, 0);
+  return { start, end };
+}
+
+function localMonthRange(year: number, month: number): { start: Date; end: Date } {
+  const start = new Date(year, month, 1, 0, 0, 0, 0);
+  const end = new Date(year, month + 1, 1, 0, 0, 0, 0);
   return { start, end };
 }

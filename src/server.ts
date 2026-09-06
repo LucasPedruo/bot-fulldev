@@ -1,10 +1,13 @@
+import type { WAMessage } from "@whiskeysockets/baileys";
 import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
 import { closeDatabase } from "./database/client.js";
 import { runMigrations } from "./database/migrate.js";
+import { createEventQnaListener } from "./events/event-qna-listener.js";
 import { createNetworkingMembershipListener } from "./networking/membership-listener.js";
 import { createNetworkingMessageListener } from "./networking/message-listener.js";
 import { queueWorker } from "./queue/queue.worker.js";
+import { eventPromoScheduler } from "./scheduler/event-promo.scheduler.js";
 import { eventRemindersScheduler } from "./scheduler/event-reminders.scheduler.js";
 import { eventsScheduler } from "./scheduler/events.scheduler.js";
 import { jobsScheduler } from "./scheduler/jobs.scheduler.js";
@@ -23,10 +26,15 @@ async function start(): Promise<void> {
     await runMigrations();
     logger.info("Database migrations applied");
 
+    // The connection only holds one message handler slot, so every enabled feature that listens to
+    // incoming messages gets composed into a single dispatcher here - each one already filters by
+    // its own configured group(s), so calling all of them per message is safe.
+    const messageHandlers: Array<(message: WAMessage) => void | Promise<void>> = [];
+
     // Both listeners feed data the scheduled feature also depends on (message counts, join/leave
     // counts for the daily summary), so they run whenever either networking feature is enabled.
     if (env.NETWORKING_IDLE_ENABLED || env.NETWORKING_SCHEDULED_ENABLED) {
-      whatsapp.setMessageHandler(
+      messageHandlers.push(
         createNetworkingMessageListener({
           getBotJids: () => {
             const user = whatsapp.getSocket()?.user;
@@ -35,6 +43,18 @@ async function start(): Promise<void> {
         })
       );
       whatsapp.setGroupParticipantsHandler(createNetworkingMembershipListener());
+    }
+
+    if (env.EVENTS_POLL_ENABLED) {
+      messageHandlers.push(createEventQnaListener());
+    }
+
+    if (messageHandlers.length > 0) {
+      whatsapp.setMessageHandler(async (message) => {
+        for (const handler of messageHandlers) {
+          await handler(message);
+        }
+      });
     }
 
     if (env.WHATSAPP_AUTO_CONNECT) {
@@ -65,6 +85,7 @@ async function start(): Promise<void> {
     if (env.EVENTS_POLL_ENABLED) {
       eventsScheduler.start();
       eventRemindersScheduler.start();
+      eventPromoScheduler.start();
     } else {
       logger.info("Events scheduler disabled");
     }
@@ -84,6 +105,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   networkingScheduledScheduler.stop();
   eventsScheduler.stop();
   eventRemindersScheduler.stop();
+  eventPromoScheduler.stop();
   queueWorker.stop();
   whatsapp.stop();
   await app.close();

@@ -140,6 +140,27 @@ void test("QueueWorker still sends a bypassQuietHours message during quiet hours
   assert.deepEqual(repository.sent, [baseMessage.id]);
 });
 
+void test("QueueWorker dispatches an eventCreation payload to the event sender", async () => {
+  const repository = new FakeRepository();
+  repository.message = {
+    ...baseMessage,
+    payload: { eventCreation: { name: "Gophercon", description: "desc", startDateIso: "2026-09-10T20:00:00.000Z" } }
+  };
+  const calls: Array<{ name: string; description?: string; startDateIso: string; endDateIso?: string }> = [];
+  const worker = new QueueWorker(repository, {
+    eventSender: async (_destination, name, description, startDateIso, endDateIso) => {
+      await Promise.resolve();
+      calls.push({ name, description, startDateIso, endDateIso });
+    },
+    now: () => new Date("2026-09-06T12:00:00")
+  });
+
+  const processed = await worker.processOne();
+
+  assert.equal(processed, true);
+  assert.deepEqual(calls, [{ name: "Gophercon", description: "desc", startDateIso: "2026-09-10T20:00:00.000Z", endDateIso: undefined }]);
+});
+
 void test("QueueWorker marks message as failed when retry limit is reached", async () => {
   const repository = new FakeRepository();
   repository.message = { ...baseMessage, attempts: 3 };

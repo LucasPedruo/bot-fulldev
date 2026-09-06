@@ -1,7 +1,7 @@
 import { env } from "../config/env.js";
 import { isQuietHours } from "../shared/quiet-hours.js";
 import { logger } from "../shared/logger.js";
-import { sendImageMessage, sendPollMessage, sendTextMessage } from "../whatsapp/sender.js";
+import { sendEventMessage, sendImageMessage, sendPollMessage, sendTextMessage } from "../whatsapp/sender.js";
 import { QueueRepository } from "./queue.repository.js";
 import type { QueueMessage } from "./queue.types.js";
 
@@ -19,6 +19,13 @@ export type QueuePollSender = (
   selectableCount?: number
 ) => Promise<void>;
 export type QueueImageSender = (destinationGroup: string, filename: string, caption?: string) => Promise<void>;
+export type QueueEventSender = (
+  destinationGroup: string,
+  name: string,
+  description: string | undefined,
+  startDateIso: string,
+  endDateIso?: string
+) => Promise<void>;
 
 export type QueueWorkerOptions = {
   intervalMs?: number;
@@ -28,6 +35,7 @@ export type QueueWorkerOptions = {
   sender?: QueueTextSender;
   pollSender?: QueuePollSender;
   imageSender?: QueueImageSender;
+  eventSender?: QueueEventSender;
   now?: () => Date;
 };
 
@@ -42,6 +50,7 @@ export class QueueWorker {
   private readonly sender: QueueTextSender;
   private readonly pollSender: QueuePollSender;
   private readonly imageSender: QueueImageSender;
+  private readonly eventSender: QueueEventSender;
   private readonly now: () => Date;
 
   constructor(
@@ -55,6 +64,7 @@ export class QueueWorker {
     this.sender = options.sender ?? sendTextMessage;
     this.pollSender = options.pollSender ?? sendPollMessage;
     this.imageSender = options.imageSender ?? sendImageMessage;
+    this.eventSender = options.eventSender ?? sendEventMessage;
     this.now = options.now ?? (() => new Date());
   }
 
@@ -137,6 +147,9 @@ export class QueueWorker {
       } else if ("image" in message.payload) {
         const { filename, caption } = message.payload.image;
         await this.imageSender(message.destinationGroup, filename, caption);
+      } else if ("eventCreation" in message.payload) {
+        const { name, description, startDateIso, endDateIso } = message.payload.eventCreation;
+        await this.eventSender(message.destinationGroup, name, description, startDateIso, endDateIso);
       } else {
         await this.sender(message.destinationGroup, message.payload.text, message.payload.mentions ?? []);
       }

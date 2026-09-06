@@ -1,12 +1,14 @@
+import { jidNormalizedUser } from "@whiskeysockets/baileys";
 import { env } from "../config/env.js";
 import { memeService, type MemeContent, type MemeService } from "../memes/meme.service.js";
 import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
 import { isQuietHours } from "../shared/quiet-hours.js";
+import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
 import { fetchTopDevToArticle, formatDevToMessage, type DevToArticle } from "./devto.provider.js";
-import { pickIdleContent } from "./idle-content.js";
+import { pickDirectQuestion, pickIdleContent } from "./idle-content.js";
 import { NetworkingRepository, type NetworkingTopicType } from "./networking.repository.js";
 
 export type NetworkingRepositoryLike = Pick<
@@ -18,6 +20,7 @@ export type QueueServiceLike = {
 };
 
 const NEWS_CHANCE = 0.2;
+const DIRECT_QUESTION_CHANCE = 0.2;
 
 export class NetworkingIdleService {
   constructor(
@@ -27,7 +30,12 @@ export class NetworkingIdleService {
     private readonly groups: string[] = getConfiguredWhatsAppGroups().networkingGroups,
     private readonly random: () => number = () => Math.random(),
     private readonly newsProvider: () => Promise<DevToArticle | undefined> = fetchTopDevToArticle,
-    private readonly memeProvider: Pick<MemeService, "pickMemeContent"> = memeService
+    private readonly memeProvider: Pick<MemeService, "pickMemeContent"> = memeService,
+    private readonly listParticipants: (groupJid: string) => Promise<string[]> = (groupJid) => whatsapp.listParticipants(groupJid),
+    private readonly getBotJids: () => string[] = () => {
+      const user = whatsapp.getSocket()?.user;
+      return [user?.id, user?.lid].filter((jid): jid is string => Boolean(jid));
+    }
   ) {}
 
   async checkAndPost(): Promise<{ posted: number }> {
@@ -69,6 +77,14 @@ export class NetworkingIdleService {
       return;
     }
 
+    if (this.random() < DIRECT_QUESTION_CHANCE) {
+      const participant = await this.pickRandomParticipant(groupJid);
+      if (participant) {
+        await this.enqueueDirectQuestion(groupJid, participant);
+        return;
+      }
+    }
+
     const recentlyUsed = await this.repository.getRecentlyUsedContent(groupJid);
     const newsArticle = this.random() < NEWS_CHANCE ? await this.newsProvider() : undefined;
 
@@ -85,6 +101,29 @@ export class NetworkingIdleService {
     }
 
     await this.enqueueText(groupJid, content.type, content.text);
+  }
+
+  private async pickRandomParticipant(groupJid: string): Promise<string | undefined> {
+    try {
+      const participants = await this.listParticipants(groupJid);
+      const normalizedBotJids = new Set(this.getBotJids().map(jidNormalizedUser));
+      const eligible = participants.filter((jid) => !normalizedBotJids.has(jidNormalizedUser(jid)));
+
+      if (eligible.length === 0) {
+        return undefined;
+      }
+
+      return eligible[Math.floor(this.random() * eligible.length)];
+    } catch (error) {
+      logger.error({ groupJid, err: error }, "Failed to list participants for idle direct question");
+      return undefined;
+    }
+  }
+
+  private async enqueueDirectQuestion(groupJid: string, participantJid: string): Promise<void> {
+    const { text, mentions } = pickDirectQuestion(participantJid);
+    await this.queue.enqueue({ type: "networking", destinationGroup: groupJid, payload: { text, mentions } });
+    logger.info({ groupJid, participantJid }, "Networking idle direct question queued");
   }
 
   private async enqueueText(groupJid: string, type: NetworkingTopicType, text: string): Promise<void> {

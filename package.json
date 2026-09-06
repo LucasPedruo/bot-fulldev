@@ -20,6 +20,7 @@
     "whatsapp:list-groups": "tsx src/whatsapp/cli/list-groups.ts",
     "whatsapp:list-participants": "tsx src/whatsapp/cli/list-participants.ts",
     "whatsapp:send-test": "tsx src/whatsapp/cli/send-test.ts",
+    "whatsapp:update-group-description": "tsx src/whatsapp/cli/update-group-description.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"

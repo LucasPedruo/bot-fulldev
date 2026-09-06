@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatEventReminderMessage, formatNewEventMessage } from "./event.formatter.js";
+import { formatEventPromoDescription, formatEventQueryReply, formatEventReminderMessage, formatNewEventMessage } from "./event.formatter.js";
 import type { PersistedEvent } from "./event.types.js";
 
 const baseEvent: PersistedEvent = {
@@ -38,4 +38,40 @@ void test("formatEventReminderMessage varies the intro per notification type", (
   assert.match(formatEventReminderMessage(baseEvent, "event_3_days"), /Faltam 3 dias para Gophercon/);
   assert.match(formatEventReminderMessage(baseEvent, "event_tomorrow"), /Amanhã é Gophercon/);
   assert.match(formatEventReminderMessage(baseEvent, "event_today"), /Hoje é Gophercon/);
+});
+
+void test("formatEventQueryReply lists matching events with date, location and url", () => {
+  const message = formatEventQueryReply([baseEvent], { month: 8 });
+
+  assert.match(message, /Eventos em setembro:/);
+  assert.match(message, /Gophercon LATAM 2026/);
+  assert.match(message, /02\/09\/2026/);
+  assert.match(message, /Florianópolis\/SC/);
+  assert.match(message, /https:\/\/gopherconlatam\.org\//);
+});
+
+void test("formatEventQueryReply combines month and location in the criteria description", () => {
+  const message = formatEventQueryReply([baseEvent], { month: 8, location: "Florianópolis" });
+
+  assert.match(message, /Eventos em setembro em Florianópolis:/);
+});
+
+void test("formatEventQueryReply falls back to a generic label with no criteria", () => {
+  const message = formatEventQueryReply([baseEvent], {});
+
+  assert.match(message, /Eventos próximos:/);
+});
+
+void test("formatEventQueryReply returns a not-found message when there are no matches", () => {
+  const message = formatEventQueryReply([], { location: "Curitiba" });
+
+  assert.match(message, /Não encontrei eventos em Curitiba/);
+});
+
+void test("formatEventPromoDescription includes location and source", () => {
+  const description = formatEventPromoDescription(baseEvent);
+
+  assert.match(description, /Florianópolis\/SC/);
+  assert.match(description, /https:\/\/gopherconlatam\.org\//);
+  assert.match(description, /Fonte: AgendaTechBrasil/);
 });

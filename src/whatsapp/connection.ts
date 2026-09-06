@@ -182,6 +182,18 @@ export class WhatsAppConnectionManager {
     this.log.info({ destinationJid, hasCaption: Boolean(caption) }, "WhatsApp image sent");
   }
 
+  async sendEvent(destinationJid: string, name: string, description: string | undefined, startDate: Date, endDate?: Date): Promise<void> {
+    const socket = this.requireConnectedSocket();
+    await socket.sendMessage(destinationJid, { event: { name, description, startDate, endDate } });
+    this.log.info({ destinationJid, name }, "WhatsApp event sent");
+  }
+
+  async updateGroupDescription(groupJid: string, description: string): Promise<void> {
+    const socket = this.requireConnectedSocket();
+    await socket.groupUpdateDescription(groupJid, description);
+    this.log.info({ groupJid }, "WhatsApp group description updated");
+  }
+
   private invokeHandler<T>(handler: ((arg: T) => void | Promise<void>) | undefined, arg: T, errorMessage: string): void {
     try {
       const result = handler?.(arg);

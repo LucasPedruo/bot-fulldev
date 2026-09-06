@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { logger } from "../../shared/logger.js";
-import { createEventFingerprint, slugify } from "../event.normalizer.js";
+import { createEventFingerprint, monthIndexByName, slugify } from "../event.normalizer.js";
 import type { EventModality, NormalizedEvent } from "../event.types.js";
 import type { EventProvider } from "./provider.interface.js";
 
@@ -31,22 +31,6 @@ const databaseSchema = z.object({
 });
 
 export type RawAgendaEvent = z.infer<typeof eventoSchema>;
-
-// The source's own "mes" field uses these exact lowercase PT-BR names.
-const monthIndexByName: Record<string, number> = {
-  janeiro: 0,
-  fevereiro: 1,
-  março: 2,
-  abril: 3,
-  maio: 4,
-  junho: 5,
-  julho: 6,
-  agosto: 7,
-  setembro: 8,
-  outubro: 9,
-  novembro: 10,
-  dezembro: 11
-};
 
 const modalityByTipo: Record<string, EventModality> = {
   presencial: "in_person",
