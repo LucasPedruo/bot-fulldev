@@ -26,19 +26,51 @@ void test("pickSpotlightMessage uses the Friday pool regardless of slot", () => 
   }
 });
 
-void test("buildDailySummary includes all four metrics", () => {
-  const summary = buildDailySummary({ jobsToday: 3, messagesToday: 42, joinedToday: 2, leftToday: 1, weekday: 3 });
+const baseSummaryInput = {
+  jobsDiscovered: 0,
+  jobsSent: 0,
+  eventsDiscovered: 0,
+  eventsSent: 0,
+  eventRemindersSent: 0,
+  networkingMessagesSent: 0,
+  failedMessages: 0,
+  messagesToday: 0,
+  joinedToday: 0,
+  leftToday: 0,
+  weekday: 3
+};
 
-  assert.match(summary, /Vagas novas hoje: 3/);
+void test("buildDailySummary includes every stat metric", () => {
+  const summary = buildDailySummary({
+    ...baseSummaryInput,
+    jobsDiscovered: 3,
+    jobsSent: 6,
+    eventsDiscovered: 0,
+    eventsSent: 0,
+    eventRemindersSent: 1,
+    networkingMessagesSent: 9,
+    failedMessages: 2,
+    messagesToday: 42,
+    joinedToday: 2,
+    leftToday: 1
+  });
+
+  assert.match(summary, /Vagas descobertas hoje: 3/);
+  assert.match(summary, /Vagas enviadas hoje: 6/);
+  assert.match(summary, /Eventos descobertos hoje: 0/);
+  assert.match(summary, /Eventos enviados hoje: 0/);
+  assert.match(summary, /Lembretes de eventos enviados hoje: 1/);
+  assert.match(summary, /Mensagens de networking enviadas hoje: 9/);
   assert.match(summary, /Mensagens trocadas no grupo: 42/);
   assert.match(summary, /Pessoas que entraram: 2/);
   assert.match(summary, /Pessoas que saíram: 1/);
+  assert.match(summary, /Mensagens com falha hoje: 2/);
 });
 
 void test("buildDailySummary varies the intro on Monday and Friday", () => {
-  const monday = buildDailySummary({ jobsToday: 0, messagesToday: 0, joinedToday: 0, leftToday: 0, weekday: 1 });
-  const friday = buildDailySummary({ jobsToday: 0, messagesToday: 0, joinedToday: 0, leftToday: 0, weekday: 5 });
-  const midweek = buildDailySummary({ jobsToday: 0, messagesToday: 0, joinedToday: 0, leftToday: 0, weekday: 3 });
+  const monday = buildDailySummary({ ...baseSummaryInput, weekday: 1 });
+  const friday = buildDailySummary({ ...baseSummaryInput, weekday: 5 });
+  const midweek = buildDailySummary({ ...baseSummaryInput, weekday: 3 });
 
   assert.match(monday, /Começando a semana/);
   assert.match(friday, /Fechando a semana/);

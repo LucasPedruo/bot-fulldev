@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { EnqueueMessageInput, QueueMessage, TextMessagePayload } from "../queue/queue.types.js";
+import type { DailyStats } from "../stats/stats.service.js";
 import {
   NetworkingScheduledService,
-  type JobRepositoryLike,
   type NetworkingRepositoryLike,
-  type QueueServiceLike
+  type QueueServiceLike,
+  type StatsServiceLike
 } from "./networking-scheduled.service.js";
 
 const group = "120363000000000001@g.us";
@@ -43,12 +44,22 @@ class FakeRepository implements NetworkingRepositoryLike {
   }
 }
 
-class FakeJobRepository implements JobRepositoryLike {
-  constructor(private readonly count = 0) {}
+const emptyDailyStats: DailyStats = {
+  jobsDiscovered: 0,
+  jobsSent: 0,
+  eventsDiscovered: 0,
+  eventsSent: 0,
+  eventRemindersSent: 0,
+  networkingMessagesSent: 0,
+  failedMessages: 0
+};
 
-  async countDiscoveredSince(): Promise<number> {
+class FakeStatsService implements StatsServiceLike {
+  constructor(private readonly stats: DailyStats = emptyDailyStats) {}
+
+  async computeDailyStats(): Promise<DailyStats> {
     await Promise.resolve();
-    return this.count;
+    return this.stats;
   }
 }
 
@@ -81,7 +92,7 @@ void test("postSpotlight excludes the bot and mentions the chosen participant", 
   const queue = new FakeQueue();
   const service = new NetworkingScheduledService(
     repository,
-    new FakeJobRepository(),
+    new FakeStatsService(),
     queue,
     () => fixedNow,
     [group],
@@ -107,7 +118,7 @@ void test("postSpotlight excludes participants spotlighted in the last 24h", asy
   const queue = new FakeQueue();
   const service = new NetworkingScheduledService(
     repository,
-    new FakeJobRepository(),
+    new FakeStatsService(),
     queue,
     () => fixedNow,
     [group],
@@ -130,7 +141,7 @@ void test("postSpotlight falls back to the full pool when everyone was recently 
   const queue = new FakeQueue();
   const service = new NetworkingScheduledService(
     repository,
-    new FakeJobRepository(),
+    new FakeStatsService(),
     queue,
     () => fixedNow,
     [group],
@@ -153,7 +164,7 @@ void test("postSpotlight skips a group with no eligible participants", async () 
   const queue = new FakeQueue();
   const service = new NetworkingScheduledService(
     repository,
-    new FakeJobRepository(),
+    new FakeStatsService(),
     queue,
     () => fixedNow,
     [group],
@@ -175,7 +186,7 @@ void test("postSpotlight logs and continues when listing participants fails", as
   const queue = new FakeQueue();
   const service = new NetworkingScheduledService(
     repository,
-    new FakeJobRepository(),
+    new FakeStatsService(),
     queue,
     () => fixedNow,
     [group],
@@ -191,12 +202,12 @@ void test("postSpotlight logs and continues when listing participants fails", as
   assert.deepEqual(queue.enqueued, []);
 });
 
-void test("postDailySummary combines jobs, messages, and membership counts", async () => {
+void test("postDailySummary combines stats, messages, and membership counts", async () => {
   const repository = new FakeRepository([], 42, { joined: 2, left: 1 });
   const queue = new FakeQueue();
   const service = new NetworkingScheduledService(
     repository,
-    new FakeJobRepository(3),
+    new FakeStatsService({ ...emptyDailyStats, jobsDiscovered: 3, jobsSent: 6, failedMessages: 2 }),
     queue,
     () => fixedNow,
     [group],
@@ -211,7 +222,9 @@ void test("postDailySummary combines jobs, messages, and membership counts", asy
 
   assert.equal(queue.enqueued.length, 1);
   const payload = queue.enqueued[0].payload as TextMessagePayload;
-  assert.match(payload.text, /Vagas novas hoje: 3/);
+  assert.match(payload.text, /Vagas descobertas hoje: 3/);
+  assert.match(payload.text, /Vagas enviadas hoje: 6/);
+  assert.match(payload.text, /Mensagens com falha hoje: 2/);
   assert.match(payload.text, /Mensagens trocadas no grupo: 42/);
   assert.match(payload.text, /Pessoas que entraram: 2/);
   assert.match(payload.text, /Pessoas que saíram: 1/);

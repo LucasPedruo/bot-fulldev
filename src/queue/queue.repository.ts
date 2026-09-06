@@ -1,8 +1,8 @@
-import { and, asc, eq, lte, sql as drizzleSql } from "drizzle-orm";
+import { and, asc, eq, gte, lte, sql as drizzleSql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../database/client.js";
 import { messageQueue } from "../database/schema.js";
-import type { EnqueueMessageInput, MessagePayload, QueueMessage } from "./queue.types.js";
+import type { EnqueueMessageInput, MessagePayload, MessageQueueType, QueueMessage } from "./queue.types.js";
 
 const textMessagePayloadSchema = z.object({
   text: z.string().min(1),
@@ -100,6 +100,24 @@ export class QueueRepository {
         processingStartedAt: null
       })
       .where(eq(messageQueue.id, id));
+  }
+
+  async countSentByTypeSince(type: MessageQueueType, since: Date): Promise<number> {
+    const [row] = await db
+      .select({ value: drizzleSql<number>`count(*)::int` })
+      .from(messageQueue)
+      .where(and(eq(messageQueue.type, type), eq(messageQueue.status, "sent"), gte(messageQueue.sentAt, since)));
+
+    return row?.value ?? 0;
+  }
+
+  async countFailedSince(since: Date): Promise<number> {
+    const [row] = await db
+      .select({ value: drizzleSql<number>`count(*)::int` })
+      .from(messageQueue)
+      .where(and(eq(messageQueue.status, "failed"), gte(messageQueue.createdAt, since)));
+
+    return row?.value ?? 0;
   }
 
   async recoverStaleProcessing(staleBefore: Date): Promise<number> {

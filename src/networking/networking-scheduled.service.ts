@@ -1,8 +1,8 @@
 import { jidNormalizedUser } from "@whiskeysockets/baileys";
-import { JobRepository } from "../jobs/job.repository.js";
 import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
+import { statsService, type StatsService } from "../stats/stats.service.js";
 import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
 import { NetworkingRepository } from "./networking.repository.js";
@@ -12,7 +12,7 @@ export type NetworkingRepositoryLike = Pick<
   NetworkingRepository,
   "getRecentSpotlightJids" | "recordSpotlight" | "getMessagesToday" | "countMembershipEventsToday"
 >;
-export type JobRepositoryLike = Pick<JobRepository, "countDiscoveredSince">;
+export type StatsServiceLike = Pick<StatsService, "computeDailyStats">;
 export type QueueServiceLike = {
   enqueue(input: Parameters<typeof queueService.enqueue>[0]): Promise<QueueMessage>;
 };
@@ -22,7 +22,7 @@ const SPOTLIGHT_LOOKBACK_HOURS = 24;
 export class NetworkingScheduledService {
   constructor(
     private readonly repository: NetworkingRepositoryLike = new NetworkingRepository(),
-    private readonly jobRepository: JobRepositoryLike = new JobRepository(),
+    private readonly stats: StatsServiceLike = statsService,
     private readonly queue: QueueServiceLike = queueService,
     private readonly now: () => Date = () => new Date(),
     private readonly groups: string[] = getConfiguredWhatsAppGroups().networkingGroups,
@@ -87,14 +87,14 @@ export class NetworkingScheduledService {
     const startOfToday = new Date(this.now());
     startOfToday.setHours(0, 0, 0, 0);
 
-    const [jobsToday, messagesToday, membership] = await Promise.all([
-      this.jobRepository.countDiscoveredSince(startOfToday),
+    const [dailyStats, messagesToday, membership] = await Promise.all([
+      this.stats.computeDailyStats(startOfToday),
       this.repository.getMessagesToday(groupJid, this.now()),
       this.repository.countMembershipEventsToday(groupJid, startOfToday)
     ]);
 
     const text = buildDailySummary({
-      jobsToday,
+      ...dailyStats,
       messagesToday,
       joinedToday: membership.joined,
       leftToday: membership.left,

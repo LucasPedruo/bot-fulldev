@@ -50,7 +50,13 @@ export function pickSpotlightMessage(slot: SpotlightSlot, tag: string, weekday: 
 }
 
 export type DailySummaryInput = {
-  jobsToday: number;
+  jobsDiscovered: number;
+  jobsSent: number;
+  eventsDiscovered: number;
+  eventsSent: number;
+  eventRemindersSent: number;
+  networkingMessagesSent: number;
+  failedMessages: number;
   messagesToday: number;
   joinedToday: number;
   leftToday: number;
@@ -68,10 +74,16 @@ export function buildDailySummary(input: DailySummaryInput): string {
   return [
     intro,
     "",
-    `Vagas novas hoje: ${input.jobsToday}`,
+    `Vagas descobertas hoje: ${input.jobsDiscovered}`,
+    `Vagas enviadas hoje: ${input.jobsSent}`,
+    `Eventos descobertos hoje: ${input.eventsDiscovered}`,
+    `Eventos enviados hoje: ${input.eventsSent}`,
+    `Lembretes de eventos enviados hoje: ${input.eventRemindersSent}`,
+    `Mensagens de networking enviadas hoje: ${input.networkingMessagesSent}`,
     `Mensagens trocadas no grupo: ${input.messagesToday}`,
     `Pessoas que entraram: ${input.joinedToday}`,
-    `Pessoas que saíram: ${input.leftToday}`
+    `Pessoas que saíram: ${input.leftToday}`,
+    `Mensagens com falha hoje: ${input.failedMessages}`
   ].join("\n");
 }
 
