@@ -317,6 +317,74 @@ NETWORKING_MENTION_MAX_PER_HOUR=5
 NETWORKING_MENTION_COOLDOWN_HOURS=2
 ```
 
+## Networking programado
+
+Diferente da ociosidade (reativa), estas sao mensagens em **horario fixo**, todo dia, controladas por `NETWORKING_SCHEDULED_ENABLED` (flag propria, independente de `NETWORKING_IDLE_ENABLED`):
+
+- **Spotlight** as `NETWORKING_MORNING_TIME`/`NETWORKING_LUNCH_TIME`/`NETWORKING_NIGHT_TIME` (08h/12h/20h por padrao): sorteia um participante real do grupo (via `WhatsAppConnectionManager.listParticipants`, novo, mesmo padrao de `listGroups`), exclui o proprio bot (telefone e LID — veja a nota sobre LID abaixo), evita repetir quem foi sorteado nas ultimas 24h (com fallback pro grupo inteiro se isso zerar as opcoes). Segunda e sexta usam moldes de mensagem proprios, diferentes do dia normal.
+- **Resumo real** as `NETWORKING_SUMMARY_TIME` (18h por padrao): ao inves de spotlight, posta um resumo com dados de verdade do dia — nao e texto generico. Ve a secao Estatisticas abaixo pros numeros exatos que entram nesse resumo.
+
+Novas tabelas: `group_membership_log` (historico de entrada/saida, usado pelo resumo), `networking_spotlight_log` (evita repetir participante).
+
+```env
+NETWORKING_SCHEDULED_ENABLED=false
+```
+
+## Estatisticas
+
+Os numeros pedidos (vagas descobertas/enviadas, eventos descobertos/enviados, lembretes de evento enviados, mensagens de networking enviadas, mensagens com falha) sao calculados a partir de mensagens **realmente enviadas/falhadas na fila** (`StatsService`, `src/stats/stats.service.ts`) — nao e estimativa. Por escolha do usuario, esses numeros nao tem endpoint nem comando CLI proprio: eles aparecem automaticamente dentro do resumo diario das 18h descrito acima. Antes do Eventos existir, os numeros de evento ficavam sempre zerados; agora refletem dados reais sem nenhuma mudanca de codigo, porque o servico ja lia de um contador generico por tipo de mensagem.
+
+## Memes
+
+Estrutura para o bot enviar imagens de meme nos grupos de Networking, misturadas no conteudo de ociosidade (`NetworkingIdleService`) com chance configuravel (`MEMES_CHANCE`, padrao 10%).
+
+`assets/memes/` comeca **vazia** — nao existem memes de verdade ainda. Para adicionar:
+
+```text
+assets/memes/
+  backend/
+    deploy-sexta.jpg
+  frontend/
+    centralizar-div.png
+```
+
+Depois rode `npm run memes:sync` para registrar os arquivos novos no banco (categoria = nome da subpasta; legenda em branco, edite depois se quiser). O meme escolhido e sempre o que esta ha mais tempo sem ser usado (tabela `memes`, colunas `category`/`filename`/`caption`/`lastUsedAt`).
+
+```env
+MEMES_DIR=assets/memes
+MEMES_SEND_ENABLED=false
+MEMES_CHANCE=0.1
+```
+
+`MEMES_SEND_ENABLED=false` por padrao — mesmo com memes cadastrados, nada e enviado ate essa flag virar `true`.
+
+## Eventos
+
+Descobre e divulga eventos de tecnologia no grupo `WHATSAPP_EVENTS_GROUP`, com lembretes automaticos.
+
+APIs de descoberta automatica de eventos (Meetup, Eventbrite, Sympla, Lu.ma) foram avaliadas e descartadas — todas exigem plano pago, tiveram a busca publica descontinuada, ou restringem o acesso aos eventos do proprio organizador (mesma categoria de problema do LinkedIn pra vagas). A fonte usada e o [agenda-tech-brasil](https://github.com/agenda-tech-brasil/agenda-tech-brasil), um calendario de eventos tech no Brasil mantido pela comunidade (5.7k stars), consumido via um JSON estruturado real e publico que a automacao deles gera:
+
+```text
+GET https://raw.githubusercontent.com/agenda-tech-brasil/agenda-tech-brasil/main/src/db/database.json
+```
+
+`AgendaTechBrasilProvider` (`src/events/providers/agenda-tech-brasil.provider.ts`) ignora anos/meses ja arquivados e qualquer evento cuja data ja passou, monta um ID sintetico estavel (a fonte nao tem ID proprio) e mapeia presencial/online/hibrido. Eventos "a definir" (sem data) so recebem a notificacao de novo evento, nunca lembrete.
+
+Lembretes automaticos em 7 dias, 3 dias, 1 dia (amanha) e no dia do evento, uma vez por tipo por evento (nunca reenvia, controlado pela tabela `event_notifications`), comparando a data do evento (guardada em UTC) contra o dia civil em `America/Sao_Paulo`, as `EVENT_REMINDER_TIME` (padrao 09:00) via `EventRemindersScheduler`.
+
+```env
+EVENTS_POLL_INTERVAL_MINUTES=15
+EVENTS_POLL_ENABLED=false
+EVENTS_MAX_PER_DAY=10
+EVENT_REMINDER_TIME=09:00
+```
+
+Validar sem salvar/enfileirar:
+
+```bash
+npm run events:poll -- --dry-run
+```
+
 ## Endpoints
 
 Healthcheck simples:
@@ -341,12 +409,23 @@ src/
   server.ts
   config/
   database/
+  events/
+    providers/
+    cli/
   jobs/
+    providers/
+    cli/
+  memes/
+    cli/
   networking/
   queue/
   scheduler/
+  stats/
   whatsapp/
+    cli/
   shared/
+assets/
+  memes/
 drizzle/
 Dockerfile
 docker-compose.yml
@@ -354,4 +433,4 @@ docker-compose.yml
 
 ## Proxima fase
 
-Eventos (`src/events/`): modelo, deduplicacao por fonte/externalId, lembretes em 7/3/1 dia e no dia, tabela de notificacoes para nao reenviar.
+Todos os itens do roadmap original (vagas, ociosidade/mencoes/entrada-saida, networking programado, estatisticas, memes, eventos) estao implementados. O que falta e producao: backup do volume `whatsapp_auth`, plano de recuperacao apos falha, atualizacao do container, monitoramento/logs centralizados, protecao de endpoints administrativos (hoje so existem `/health` e `/ready`, sem autenticacao — relevante quando algum endpoint de controle for adicionado) e configuracao de VPS.
