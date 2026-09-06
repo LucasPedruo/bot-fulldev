@@ -89,3 +89,22 @@ export const jobDeliveries = pgTable(
     index("job_deliveries_destination_idx").on(table.destinationGroup)
   ]
 );
+
+export const groupActivity = pgTable("group_activity", {
+  groupJid: text("group_jid").primaryKey(),
+  lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const networkingTopicType = pgEnum("networking_topic_type", ["joke", "poll", "critique", "news"]);
+
+export const networkingTopicHistory = pgTable(
+  "networking_topic_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    groupJid: text("group_jid").notNull(),
+    type: networkingTopicType("type").notNull(),
+    content: text("content").notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [index("networking_topic_history_group_used_idx").on(table.groupJid, table.usedAt)]
+);

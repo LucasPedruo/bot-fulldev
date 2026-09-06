@@ -9,7 +9,15 @@ export type TextMessagePayload = {
   mentions?: string[];
 };
 
-export type MessagePayload = TextMessagePayload;
+export type PollMessagePayload = {
+  poll: {
+    name: string;
+    values: string[];
+    selectableCount?: number;
+  };
+};
+
+export type MessagePayload = TextMessagePayload | PollMessagePayload;
 
 export type QueueMessage = {
   id: string;

@@ -76,7 +76,12 @@ const envSchema = z.object({
   NETWORKING_MORNING_TIME: timeSchema.default("08:00"),
   NETWORKING_LUNCH_TIME: timeSchema.default("12:00"),
   NETWORKING_SUMMARY_TIME: timeSchema.default("18:00"),
-  NETWORKING_NIGHT_TIME: timeSchema.default("20:00")
+  NETWORKING_NIGHT_TIME: timeSchema.default("20:00"),
+  QUIET_HOURS_START: timeSchema.default("00:00"),
+  QUIET_HOURS_END: timeSchema.default("07:00"),
+  NETWORKING_IDLE_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  NETWORKING_IDLE_THRESHOLD_MINUTES: z.coerce.number().int().positive().default(60),
+  NETWORKING_IDLE_CHECK_INTERVAL_MINUTES: z.coerce.number().int().positive().default(10)
 });
 
 export type Env = z.infer<typeof envSchema>;

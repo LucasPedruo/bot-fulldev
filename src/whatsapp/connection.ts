@@ -5,6 +5,7 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
   type GroupMetadata,
+  type WAMessage,
   type WASocket
 } from "@whiskeysockets/baileys";
 import { mkdir } from "node:fs/promises";
@@ -29,6 +30,7 @@ export class WhatsAppConnectionManager {
   private reconnectTimer?: NodeJS.Timeout;
   private reconnectAttempts = 0;
   private stopping = false;
+  private messageHandler?: (message: WAMessage) => void | Promise<void>;
   private readonly authDir: string;
   private readonly log: Logger;
 
@@ -43,6 +45,10 @@ export class WhatsAppConnectionManager {
 
   getSocket(): WASocket | undefined {
     return this.socket;
+  }
+
+  setMessageHandler(handler: (message: WAMessage) => void | Promise<void>): void {
+    this.messageHandler = handler;
   }
 
   async start(): Promise<void> {
@@ -72,6 +78,20 @@ export class WhatsAppConnectionManager {
 
     this.socket.ev.on("creds.update", () => {
       void saveCreds();
+    });
+    this.socket.ev.on("messages.upsert", (update) => {
+      for (const message of update.messages) {
+        try {
+          const result = this.messageHandler?.(message);
+          if (result instanceof Promise) {
+            result.catch((error: unknown) => {
+              this.log.error({ err: error }, "Message handler failed");
+            });
+          }
+        } catch (error) {
+          this.log.error({ err: error }, "Message handler failed");
+        }
+      }
     });
     this.socket.ev.on("connection.update", (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -142,6 +162,12 @@ export class WhatsAppConnectionManager {
     const socket = this.requireConnectedSocket();
     await socket.sendMessage(destinationJid, { text, mentions });
     this.log.info({ destinationJid, mentionsCount: mentions.length }, "WhatsApp text message sent");
+  }
+
+  async sendPoll(destinationJid: string, name: string, values: string[], selectableCount = 1): Promise<void> {
+    const socket = this.requireConnectedSocket();
+    await socket.sendMessage(destinationJid, { poll: { name, values, selectableCount } });
+    this.log.info({ destinationJid, optionsCount: values.length }, "WhatsApp poll sent");
   }
 
   private requireConnectedSocket(): WASocket {

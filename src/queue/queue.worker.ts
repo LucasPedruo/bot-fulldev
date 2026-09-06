@@ -1,6 +1,7 @@
 import { env } from "../config/env.js";
+import { isQuietHours } from "../shared/quiet-hours.js";
 import { logger } from "../shared/logger.js";
-import { sendTextMessage } from "../whatsapp/sender.js";
+import { sendPollMessage, sendTextMessage } from "../whatsapp/sender.js";
 import { QueueRepository } from "./queue.repository.js";
 import type { QueueMessage } from "./queue.types.js";
 
@@ -10,14 +11,22 @@ export type QueueRepositoryLike = Pick<
   "claimNext" | "markFailed" | "markSent" | "recoverStaleProcessing" | "reschedulePending"
 >;
 
-export type QueueSender = (destinationGroup: string, text: string, mentions: string[]) => Promise<void>;
+export type QueueTextSender = (destinationGroup: string, text: string, mentions: string[]) => Promise<void>;
+export type QueuePollSender = (
+  destinationGroup: string,
+  name: string,
+  values: string[],
+  selectableCount?: number
+) => Promise<void>;
 
 export type QueueWorkerOptions = {
   intervalMs?: number;
   maxRetries?: number;
   retryDelayMs?: number;
   staleProcessingMs?: number;
-  sender?: QueueSender;
+  sender?: QueueTextSender;
+  pollSender?: QueuePollSender;
+  now?: () => Date;
 };
 
 export class QueueWorker {
@@ -28,7 +37,9 @@ export class QueueWorker {
   private readonly maxRetries: number;
   private readonly retryDelayMs: number;
   private readonly staleProcessingMs: number;
-  private readonly sender: QueueSender;
+  private readonly sender: QueueTextSender;
+  private readonly pollSender: QueuePollSender;
+  private readonly now: () => Date;
 
   constructor(
     private readonly repository: QueueRepositoryLike = new QueueRepository(),
@@ -39,6 +50,8 @@ export class QueueWorker {
     this.retryDelayMs = options.retryDelayMs ?? this.intervalMs;
     this.staleProcessingMs = options.staleProcessingMs ?? Math.max(this.intervalMs * 3, 5 * 60_000);
     this.sender = options.sender ?? sendTextMessage;
+    this.pollSender = options.pollSender ?? sendPollMessage;
+    this.now = options.now ?? (() => new Date());
   }
 
   getStatus(): QueueWorkerStatus {
@@ -72,6 +85,10 @@ export class QueueWorker {
 
   async processOne(): Promise<boolean> {
     if (this.running) {
+      return false;
+    }
+
+    if (isQuietHours(this.now())) {
       return false;
     }
 
@@ -114,7 +131,13 @@ export class QueueWorker {
 
   private async deliver(message: QueueMessage): Promise<void> {
     try {
-      await this.sender(message.destinationGroup, message.payload.text, message.payload.mentions ?? []);
+      if ("poll" in message.payload) {
+        const { name, values, selectableCount } = message.payload.poll;
+        await this.pollSender(message.destinationGroup, name, values, selectableCount);
+      } else {
+        await this.sender(message.destinationGroup, message.payload.text, message.payload.mentions ?? []);
+      }
+
       await this.repository.markSent(message.id);
       logger.info({ messageId: message.id, destinationGroup: message.destinationGroup }, "Message sent");
     } catch (error) {

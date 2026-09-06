@@ -93,6 +93,26 @@ void test("QueueWorker reschedules failed messages while attempts remain", async
   assert.deepEqual(repository.failed, []);
 });
 
+void test("QueueWorker does not claim or send anything during quiet hours", async () => {
+  const repository = new FakeRepository();
+  repository.message = baseMessage;
+  const sent: string[] = [];
+  const worker = new QueueWorker(repository, {
+    sender: async (_destination, text) => {
+      await Promise.resolve();
+      sent.push(text);
+    },
+    now: () => new Date("2026-09-06T03:00:00")
+  });
+
+  const processed = await worker.processOne();
+
+  assert.equal(processed, false);
+  assert.deepEqual(sent, []);
+  assert.deepEqual(repository.sent, []);
+  assert.equal(repository.message, baseMessage);
+});
+
 void test("QueueWorker marks message as failed when retry limit is reached", async () => {
   const repository = new FakeRepository();
   repository.message = { ...baseMessage, attempts: 3 };

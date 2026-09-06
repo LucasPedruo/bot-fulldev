@@ -4,10 +4,20 @@ import { db } from "../database/client.js";
 import { messageQueue } from "../database/schema.js";
 import type { EnqueueMessageInput, MessagePayload, QueueMessage } from "./queue.types.js";
 
-const messagePayloadSchema = z.object({
+const textMessagePayloadSchema = z.object({
   text: z.string().min(1),
   mentions: z.array(z.string()).optional()
 });
+
+const pollMessagePayloadSchema = z.object({
+  poll: z.object({
+    name: z.string().min(1),
+    values: z.array(z.string()).min(1),
+    selectableCount: z.number().int().positive().optional()
+  })
+});
+
+const messagePayloadSchema = z.union([textMessagePayloadSchema, pollMessagePayloadSchema]);
 
 type MessageQueueRow = typeof messageQueue.$inferSelect;
 

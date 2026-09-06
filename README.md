@@ -283,6 +283,31 @@ docker compose exec app node dist/jobs/cli/poll.js --dry-run
 docker compose exec app node dist/jobs/cli/poll.js
 ```
 
+## Silencio noturno
+
+Nenhuma mensagem do bot sai entre `QUIET_HOURS_START` e `QUIET_HOURS_END` (padrao 00:00-07:00), independente do tipo (vaga, evento, networking, manual). A regra fica num unico lugar, `QueueWorker.processOne` (`src/queue/queue.worker.ts`), que se recusa a reivindicar qualquer mensagem da fila enquanto `isQuietHours` (`src/shared/quiet-hours.ts`) for verdadeiro. Mensagens agendadas para a madrugada continuam `pending` e saem automaticamente assim que a janela termina — nenhum outro modulo (scheduler, service, listener) precisa se preocupar com isso.
+
+## Networking: ociosidade e mencoes
+
+Os 2 grupos de Networking configurados tem duas automacoes reativas:
+
+- **Ociosidade**: se um grupo ficar `NETWORKING_IDLE_THRESHOLD_MINUTES` (padrao 60) sem nenhuma mensagem, o bot puxa assunto — piada, critica de linguagem, enquete (poll nativo do WhatsApp) ou, ocasionalmente, uma noticia real de tech via [Dev.to API](https://developers.forem.com/api) (`GET https://dev.to/api/articles?top=1`, publica, sem chave). Verificado a cada `NETWORKING_IDLE_CHECK_INTERVAL_MINUTES` (padrao 10) via `NetworkingIdleScheduler` (`src/scheduler/networking-idle.scheduler.ts`).
+- **Mencao**: se alguem mencionar o bot com `@` num desses grupos, ele responde com uma besteira e menciona a pessoa de volta.
+
+Conteudo gerado por **templates com partes variaveis** (linguagem/framework/tema sorteados), sem IA generativa — decisao explicita para nao gastar token. `src/networking/idle-content.ts` guarda os moldes; `NetworkingRepository` (`group_activity`, `networking_topic_history`) evita repetir os ultimos usados por grupo e guarda o timestamp da ultima atividade real (atualizado por um listener de `messages.upsert` no Baileys, que hoje nao existia).
+
+Postar um topico de ociosidade **reseta o relogio de silencio** daquele grupo (evita disparar de novo antes de completar mais uma hora real de silencio).
+
+Desligado por padrao (`NETWORKING_IDLE_ENABLED=false`):
+
+```env
+QUIET_HOURS_START=00:00
+QUIET_HOURS_END=07:00
+NETWORKING_IDLE_ENABLED=false
+NETWORKING_IDLE_THRESHOLD_MINUTES=60
+NETWORKING_IDLE_CHECK_INTERVAL_MINUTES=10
+```
+
 ## Endpoints
 
 Healthcheck simples:
@@ -307,7 +332,10 @@ src/
   server.ts
   config/
   database/
+  jobs/
+  networking/
   queue/
+  scheduler/
   whatsapp/
   shared/
 drizzle/
@@ -317,4 +345,4 @@ docker-compose.yml
 
 ## Proxima fase
 
-Proximo passo: adicionar RemoteOK, validando documentacao atual, normalizacao e deduplicacao antes de habilitar no scheduler.
+Eventos (`src/events/`): modelo, deduplicacao por fonte/externalId, lembretes em 7/3/1 dia e no dia, tabela de notificacoes para nao reenviar.
