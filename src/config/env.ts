@@ -83,7 +83,8 @@ const envSchema = z.object({
   NETWORKING_IDLE_THRESHOLD_MINUTES: z.coerce.number().int().positive().default(60),
   NETWORKING_IDLE_CHECK_INTERVAL_MINUTES: z.coerce.number().int().positive().default(10),
   NETWORKING_MENTION_MAX_PER_HOUR: z.coerce.number().int().positive().default(5),
-  NETWORKING_MENTION_COOLDOWN_HOURS: z.coerce.number().int().positive().default(2)
+  NETWORKING_MENTION_COOLDOWN_HOURS: z.coerce.number().int().positive().default(2),
+  NETWORKING_SCHEDULED_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false)
 });
 
 export type Env = z.infer<typeof envSchema>;

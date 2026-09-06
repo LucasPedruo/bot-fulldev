@@ -4,21 +4,25 @@ import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
 import { buildWelcomeMessage, pickGoodbyeMessage } from "./idle-content.js";
+import { NetworkingRepository } from "./networking.repository.js";
 
 export type GroupParticipantsUpdate = BaileysEventMap["group-participants.update"];
 export type QueueServiceLike = {
   enqueue(input: Parameters<typeof queueService.enqueue>[0]): Promise<QueueMessage>;
 };
+export type NetworkingRepositoryLike = Pick<NetworkingRepository, "recordMembershipEvent">;
 
 export type MembershipListenerOptions = {
   networkingGroups?: string[];
   queue?: QueueServiceLike;
+  repository?: NetworkingRepositoryLike;
 };
 
 export function createNetworkingMembershipListener(
   options: MembershipListenerOptions = {}
 ): (update: GroupParticipantsUpdate) => Promise<void> {
   const queue = options.queue ?? queueService;
+  const repository = options.repository ?? new NetworkingRepository();
 
   return async function handleGroupParticipantsUpdate(update: GroupParticipantsUpdate): Promise<void> {
     const networkingGroups = options.networkingGroups ?? getConfiguredWhatsAppGroups().networkingGroups;
@@ -28,6 +32,8 @@ export function createNetworkingMembershipListener(
 
     if (update.action === "add") {
       const participantJids = update.participants.map((participant) => participant.id);
+      await Promise.all(participantJids.map((jid) => repository.recordMembershipEvent(update.id, jid, "add")));
+
       const { text, mentions } = buildWelcomeMessage(participantJids);
       await queue.enqueue({
         type: "networking",
@@ -42,6 +48,9 @@ export function createNetworkingMembershipListener(
     }
 
     if (update.action === "remove") {
+      const participantJids = update.participants.map((participant) => participant.id);
+      await Promise.all(participantJids.map((jid) => repository.recordMembershipEvent(update.id, jid, "remove")));
+
       await queue.enqueue({
         type: "networking",
         destinationGroup: update.id,

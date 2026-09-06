@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, index, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 export const appMetadata = pgTable("app_metadata", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -94,8 +94,38 @@ export const jobDeliveries = pgTable(
 export const groupActivity = pgTable("group_activity", {
   groupJid: text("group_jid").primaryKey(),
   lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
-  mentionMuteUntil: timestamp("mention_mute_until", { withTimezone: true })
+  mentionMuteUntil: timestamp("mention_mute_until", { withTimezone: true }),
+  messagesToday: integer("messages_today").notNull().default(0),
+  messagesTodayDate: date("messages_today_date")
 });
+
+export const groupMembershipAction = pgEnum("group_membership_action", ["add", "remove"]);
+
+export const groupMembershipLog = pgTable(
+  "group_membership_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    groupJid: text("group_jid").notNull(),
+    participantJid: text("participant_jid").notNull(),
+    action: groupMembershipAction("action").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [index("group_membership_log_group_occurred_idx").on(table.groupJid, table.occurredAt)]
+);
+
+export const networkingSpotlightSlot = pgEnum("networking_spotlight_slot", ["morning", "lunch", "night"]);
+
+export const networkingSpotlightLog = pgTable(
+  "networking_spotlight_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    groupJid: text("group_jid").notNull(),
+    participantJid: text("participant_jid").notNull(),
+    slot: networkingSpotlightSlot("slot").notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [index("networking_spotlight_log_group_slot_used_idx").on(table.groupJid, table.slot, table.usedAt)]
+);
 
 export const mentionReplyLog = pgTable(
   "mention_reply_log",

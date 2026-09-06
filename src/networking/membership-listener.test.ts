@@ -1,9 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { EnqueueMessageInput, QueueMessage, TextMessagePayload } from "../queue/queue.types.js";
-import { createNetworkingMembershipListener, type GroupParticipantsUpdate, type QueueServiceLike } from "./membership-listener.js";
+import {
+  createNetworkingMembershipListener,
+  type GroupParticipantsUpdate,
+  type NetworkingRepositoryLike,
+  type QueueServiceLike
+} from "./membership-listener.js";
 
 const networkingGroups = ["120363000000000001@g.us", "120363000000000002@g.us"];
+
+class FakeRepository implements NetworkingRepositoryLike {
+  public recorded: Array<{ groupJid: string; participantJid: string; action: string }> = [];
+
+  async recordMembershipEvent(groupJid: string, participantJid: string, action: string): Promise<void> {
+    await Promise.resolve();
+    this.recorded.push({ groupJid, participantJid, action });
+  }
+}
 
 class FakeQueue implements QueueServiceLike {
   public enqueued: EnqueueMessageInput[] = [];
@@ -48,7 +62,8 @@ void test("ignores group-participants updates outside the configured networking 
 
 void test("queues a welcome message mentioning every new participant", async () => {
   const queue = new FakeQueue();
-  const listener = createNetworkingMembershipListener({ networkingGroups, queue });
+  const repository = new FakeRepository();
+  const listener = createNetworkingMembershipListener({ networkingGroups, queue, repository });
 
   await listener(
     buildUpdate({
@@ -64,11 +79,16 @@ void test("queues a welcome message mentioning every new participant", async () 
   assert.deepEqual(payload.mentions, ["5511999999999@s.whatsapp.net", "5521988888888@s.whatsapp.net"]);
   assert.match(payload.text, /@5511999999999/);
   assert.equal(queue.enqueued[0].bypassQuietHours, true);
+  assert.deepEqual(repository.recorded, [
+    { groupJid: networkingGroups[0], participantJid: "5511999999999@s.whatsapp.net", action: "add" },
+    { groupJid: networkingGroups[0], participantJid: "5521988888888@s.whatsapp.net", action: "add" }
+  ]);
 });
 
 void test("queues an iconic goodbye message when a participant leaves", async () => {
   const queue = new FakeQueue();
-  const listener = createNetworkingMembershipListener({ networkingGroups, queue });
+  const repository = new FakeRepository();
+  const listener = createNetworkingMembershipListener({ networkingGroups, queue, repository });
 
   await listener(buildUpdate({ id: networkingGroups[1], action: "remove", participants: [{ id: "5511999999999@s.whatsapp.net" }] }));
 
@@ -77,6 +97,9 @@ void test("queues an iconic goodbye message when a participant leaves", async ()
   const payload = queue.enqueued[0].payload as TextMessagePayload;
   assert.ok(payload.text.length > 0);
   assert.equal(queue.enqueued[0].bypassQuietHours, true);
+  assert.deepEqual(repository.recorded, [
+    { groupJid: networkingGroups[1], participantJid: "5511999999999@s.whatsapp.net", action: "remove" }
+  ]);
 });
 
 void test("ignores promote/demote/modify actions", async () => {

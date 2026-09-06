@@ -158,6 +158,12 @@ export class WhatsAppConnectionManager {
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }
 
+  async listParticipants(groupJid: string): Promise<string[]> {
+    const socket = this.requireConnectedSocket();
+    const metadata = await socket.groupMetadata(groupJid);
+    return metadata.participants.map((participant) => participant.id);
+  }
+
   async sendText(destinationJid: string, text: string, mentions: string[] = []): Promise<void> {
     const socket = this.requireConnectedSocket();
     await socket.sendMessage(destinationJid, { text, mentions });

@@ -7,6 +7,7 @@ import { createNetworkingMessageListener } from "./networking/message-listener.j
 import { queueWorker } from "./queue/queue.worker.js";
 import { jobsScheduler } from "./scheduler/jobs.scheduler.js";
 import { networkingIdleScheduler } from "./scheduler/networking-idle.scheduler.js";
+import { networkingScheduledScheduler } from "./scheduler/networking-scheduled.scheduler.js";
 import { logger } from "./shared/logger.js";
 import { whatsapp } from "./whatsapp/client.js";
 
@@ -20,7 +21,9 @@ async function start(): Promise<void> {
     await runMigrations();
     logger.info("Database migrations applied");
 
-    if (env.NETWORKING_IDLE_ENABLED) {
+    // Both listeners feed data the scheduled feature also depends on (message counts, join/leave
+    // counts for the daily summary), so they run whenever either networking feature is enabled.
+    if (env.NETWORKING_IDLE_ENABLED || env.NETWORKING_SCHEDULED_ENABLED) {
       whatsapp.setMessageHandler(
         createNetworkingMessageListener({
           getBotJids: () => {
@@ -51,6 +54,12 @@ async function start(): Promise<void> {
       logger.info("Networking idle scheduler disabled");
     }
 
+    if (env.NETWORKING_SCHEDULED_ENABLED) {
+      networkingScheduledScheduler.start();
+    } else {
+      logger.info("Networking scheduled scheduler disabled");
+    }
+
     await app.listen({ host: env.HOST, port: env.PORT });
     logger.info({ host: env.HOST, port: env.PORT, timezone: env.TZ }, "Server started");
   } catch (error) {
@@ -63,6 +72,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   logger.info({ signal }, "Shutting down");
   jobsScheduler.stop();
   networkingIdleScheduler.stop();
+  networkingScheduledScheduler.stop();
   queueWorker.stop();
   whatsapp.stop();
   await app.close();
