@@ -176,6 +176,12 @@ export class WhatsAppConnectionManager {
     this.log.info({ destinationJid, optionsCount: values.length }, "WhatsApp poll sent");
   }
 
+  async sendImage(destinationJid: string, image: Buffer, caption?: string): Promise<void> {
+    const socket = this.requireConnectedSocket();
+    await socket.sendMessage(destinationJid, { image, caption });
+    this.log.info({ destinationJid, hasCaption: Boolean(caption) }, "WhatsApp image sent");
+  }
+
   private invokeHandler<T>(handler: ((arg: T) => void | Promise<void>) | undefined, arg: T, errorMessage: string): void {
     try {
       const result = handler?.(arg);

@@ -167,3 +167,58 @@ void test("falls back to a template topic when the news provider fails", async (
   assert.equal(queue.enqueued.length, 1);
   assert.notEqual(repository.recorded[0].type, "news");
 });
+
+void test("posts a meme when the meme roll hits and the provider returns content", async () => {
+  const repository = new FakeRepository(new Date(dayTime.getTime() - 61 * 60_000));
+  const queue = new FakeQueue();
+  const service = new NetworkingIdleService(
+    repository,
+    queue,
+    () => dayTime,
+    [group],
+    () => 0.0,
+    async () => {
+      await Promise.resolve();
+      throw new Error("newsProvider should not be called");
+    },
+    {
+      pickMemeContent: async () => {
+        await Promise.resolve();
+        return { filename: "bug-in-prod.jpg", caption: "Sexta-feira" };
+      }
+    }
+  );
+
+  const result = await service.checkAndPost();
+
+  assert.deepEqual(result, { posted: 1 });
+  assert.equal(queue.enqueued.length, 1);
+  assert.deepEqual(queue.enqueued[0].payload, { image: { filename: "bug-in-prod.jpg", caption: "Sexta-feira" } });
+});
+
+void test("falls back past the meme check when the meme provider returns nothing", async () => {
+  const repository = new FakeRepository(new Date(dayTime.getTime() - 61 * 60_000));
+  const queue = new FakeQueue();
+  const service = new NetworkingIdleService(
+    repository,
+    queue,
+    () => dayTime,
+    [group],
+    () => 0.0,
+    async () => {
+      await Promise.resolve();
+      return { title: "Why TypeScript Rocks", url: "https://dev.to/example" };
+    },
+    {
+      pickMemeContent: async () => {
+        await Promise.resolve();
+        return undefined;
+      }
+    }
+  );
+
+  await service.checkAndPost();
+
+  const payload = queue.enqueued[0].payload as { text: string };
+  assert.match(payload.text, /Why TypeScript Rocks/);
+});

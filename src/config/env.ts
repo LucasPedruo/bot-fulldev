@@ -84,7 +84,10 @@ const envSchema = z.object({
   NETWORKING_IDLE_CHECK_INTERVAL_MINUTES: z.coerce.number().int().positive().default(10),
   NETWORKING_MENTION_MAX_PER_HOUR: z.coerce.number().int().positive().default(5),
   NETWORKING_MENTION_COOLDOWN_HOURS: z.coerce.number().int().positive().default(2),
-  NETWORKING_SCHEDULED_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false)
+  NETWORKING_SCHEDULED_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  MEMES_DIR: z.string().min(1).default("assets/memes"),
+  MEMES_SEND_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  MEMES_CHANCE: z.coerce.number().min(0).max(1).default(0.1)
 });
 
 export type Env = z.infer<typeof envSchema>;

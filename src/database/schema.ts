@@ -137,6 +137,14 @@ export const mentionReplyLog = pgTable(
   (table) => [index("mention_reply_log_group_replied_idx").on(table.groupJid, table.repliedAt)]
 );
 
+export const memes = pgTable("memes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  category: text("category").notNull(),
+  filename: text("filename").notNull().unique(),
+  caption: text("caption"),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true })
+});
+
 export const networkingTopicType = pgEnum("networking_topic_type", ["joke", "poll", "critique", "news"]);
 
 export const networkingTopicHistory = pgTable(

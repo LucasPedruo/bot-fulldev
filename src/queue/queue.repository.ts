@@ -17,7 +17,14 @@ const pollMessagePayloadSchema = z.object({
   })
 });
 
-const messagePayloadSchema = z.union([textMessagePayloadSchema, pollMessagePayloadSchema]);
+const imageMessagePayloadSchema = z.object({
+  image: z.object({
+    filename: z.string().min(1),
+    caption: z.string().optional()
+  })
+});
+
+const messagePayloadSchema = z.union([textMessagePayloadSchema, pollMessagePayloadSchema, imageMessagePayloadSchema]);
 
 type MessageQueueRow = typeof messageQueue.$inferSelect;
 

@@ -1,7 +1,7 @@
 import { env } from "../config/env.js";
 import { isQuietHours } from "../shared/quiet-hours.js";
 import { logger } from "../shared/logger.js";
-import { sendPollMessage, sendTextMessage } from "../whatsapp/sender.js";
+import { sendImageMessage, sendPollMessage, sendTextMessage } from "../whatsapp/sender.js";
 import { QueueRepository } from "./queue.repository.js";
 import type { QueueMessage } from "./queue.types.js";
 
@@ -18,6 +18,7 @@ export type QueuePollSender = (
   values: string[],
   selectableCount?: number
 ) => Promise<void>;
+export type QueueImageSender = (destinationGroup: string, filename: string, caption?: string) => Promise<void>;
 
 export type QueueWorkerOptions = {
   intervalMs?: number;
@@ -26,6 +27,7 @@ export type QueueWorkerOptions = {
   staleProcessingMs?: number;
   sender?: QueueTextSender;
   pollSender?: QueuePollSender;
+  imageSender?: QueueImageSender;
   now?: () => Date;
 };
 
@@ -39,6 +41,7 @@ export class QueueWorker {
   private readonly staleProcessingMs: number;
   private readonly sender: QueueTextSender;
   private readonly pollSender: QueuePollSender;
+  private readonly imageSender: QueueImageSender;
   private readonly now: () => Date;
 
   constructor(
@@ -51,6 +54,7 @@ export class QueueWorker {
     this.staleProcessingMs = options.staleProcessingMs ?? Math.max(this.intervalMs * 3, 5 * 60_000);
     this.sender = options.sender ?? sendTextMessage;
     this.pollSender = options.pollSender ?? sendPollMessage;
+    this.imageSender = options.imageSender ?? sendImageMessage;
     this.now = options.now ?? (() => new Date());
   }
 
@@ -130,6 +134,9 @@ export class QueueWorker {
       if ("poll" in message.payload) {
         const { name, values, selectableCount } = message.payload.poll;
         await this.pollSender(message.destinationGroup, name, values, selectableCount);
+      } else if ("image" in message.payload) {
+        const { filename, caption } = message.payload.image;
+        await this.imageSender(message.destinationGroup, filename, caption);
       } else {
         await this.sender(message.destinationGroup, message.payload.text, message.payload.mentions ?? []);
       }

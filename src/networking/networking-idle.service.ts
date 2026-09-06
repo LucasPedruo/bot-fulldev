@@ -1,4 +1,5 @@
 import { env } from "../config/env.js";
+import { memeService, type MemeContent, type MemeService } from "../memes/meme.service.js";
 import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
@@ -25,7 +26,8 @@ export class NetworkingIdleService {
     private readonly now: () => Date = () => new Date(),
     private readonly groups: string[] = getConfiguredWhatsAppGroups().networkingGroups,
     private readonly random: () => number = () => Math.random(),
-    private readonly newsProvider: () => Promise<DevToArticle | undefined> = fetchTopDevToArticle
+    private readonly newsProvider: () => Promise<DevToArticle | undefined> = fetchTopDevToArticle,
+    private readonly memeProvider: Pick<MemeService, "pickMemeContent"> = memeService
   ) {}
 
   async checkAndPost(): Promise<{ posted: number }> {
@@ -60,6 +62,13 @@ export class NetworkingIdleService {
     // queue (retry, quiet hours) doesn't let the next scheduler tick fire a second one.
     await this.repository.touchActivity(groupJid, this.now());
 
+    const memeContent = this.random() < env.MEMES_CHANCE ? await this.memeProvider.pickMemeContent() : undefined;
+
+    if (memeContent) {
+      await this.enqueueImage(groupJid, memeContent);
+      return;
+    }
+
     const recentlyUsed = await this.repository.getRecentlyUsedContent(groupJid);
     const newsArticle = this.random() < NEWS_CHANCE ? await this.newsProvider() : undefined;
 
@@ -88,6 +97,15 @@ export class NetworkingIdleService {
     await this.queue.enqueue({ type: "networking", destinationGroup: groupJid, payload: { poll: { name, values } } });
     await this.repository.recordTopicUsed({ groupJid, type: "poll", content: name });
     logger.info({ groupJid, type: "poll" }, "Networking idle topic queued");
+  }
+
+  private async enqueueImage(groupJid: string, content: MemeContent): Promise<void> {
+    await this.queue.enqueue({
+      type: "networking",
+      destinationGroup: groupJid,
+      payload: { image: { filename: content.filename, caption: content.caption } }
+    });
+    logger.info({ groupJid, filename: content.filename }, "Networking meme queued");
   }
 }
 
