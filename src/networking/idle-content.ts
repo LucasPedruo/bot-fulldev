@@ -12,36 +12,49 @@ const temas = [
   "dívida técnica",
   "regex"
 ];
+// Retro references for the bot's "dev tiozão" persona - a veteran developer who compares
+// everything to the old days and tells corny, nostalgic jokes.
+const retro = [
+  "disquete",
+  "internet discada",
+  "Windows 98",
+  "Turbo Pascal",
+  "MSN Messenger",
+  "Orkut",
+  "MS-DOS",
+  "fita K7",
+  "Nokia 3310",
+  "ICQ"
+];
 
 export type IdleContent = { type: "joke" | "critique"; text: string } | { type: "poll"; name: string; values: string[] };
 
 const jokeTemplates: Array<() => string> = [
-  () => `Confissão do dia: ainda confundo ${pickOne(languages)} com ${pickOne(languages)} quando tô com sono.`,
-  () => `Todo mundo aqui já brigou com o ${pickOne(frameworks)} pelo menos uma vez essa semana, né?`,
-  () => `PSA: se o bug sumiu sozinho depois de um print, não foi mágica, foi ${pickOne(languages)} sendo ${pickOne(languages)}.`,
-  () => `Hoje decidi que ${pickOne(temas)} é responsável por 90% dos meus problemas. Concordam?`,
-  () => `Quem mais acha que ${pickOne(frameworks)} deveria vir com aviso "leia a documentação 3 vezes antes de usar"?`,
-  () => `"Funciona na minha máquina" é a frase mais usada em ${pickOne(languages)} e a menos confiável do universo.`,
-  () => `Nível de confiança ao fazer deploy numa sexta usando ${pickOne(frameworks)}: 0%.`,
-  () => `Alguém mais acha ${pickOne(temas)} mais fácil de explicar que de aplicar de verdade?`,
-  () => `Se ${pickOne(languages)} fosse pessoa, já teria brigado com ${pickOne(languages)} pelo menos uma vez hoje.`,
-  () => `Debugar ${pickOne(frameworks)} às vezes parece arqueologia: cada camada revela um mistério novo.`,
-  () => `Ninguém: absolutamente ninguém: eu, às 2h da manhã, tentando entender uma stack trace de ${pickOne(languages)}.`,
-  () => `${pickOne(temas)} é tipo academia: todo mundo fala que devia fazer mais.`,
-  () => `Quantas abas do Stack Overflow abertas é considerado normal quando se mexe com ${pickOne(frameworks)}?`,
-  () => `Hoje é dia de comemorar: consegui centralizar uma div sem culpar o ${pickOne(frameworks)}.`,
-  () => `Reunião de standup: "ontem mexi com ${pickOne(languages)}". Tradução: sofri em silêncio.`
+  () => `Na minha época a gente debugava com printf e muita fé. Hoje tem ${pickOne(frameworks)} chique e ainda reclamam. kkkkk`,
+  () => `Quem aqui já salvou código em ${pickOne(["disquete", "fita K7"])} e rezou pra não corromper? Isso sim era programar com emoção.`,
+  () => `Confissão de tiozão: aprendi ${pickOne(languages)} numa apostila emprestada e decorando atalho de CTRL+C CTRL+V. Rapaziada de hoje não sabe o que é sofrer.`,
+  () => `Se o bug sumiu sozinho depois de reiniciar o PC, não foi mágica, foi o espírito do ${pickOne(retro)} abençoando o código.`,
+  () => `Deploy numa sexta era normal no meu tempo, só que a gente rezava pro FTP não cair no meio. Hoje tem ${pickOne(frameworks)} e ainda tem medo? kkkk`,
+  () => `Fiz meu primeiro site com <marquee> e <blink> e achava o auge da tecnologia. ${pickOne(frameworks)} de hoje é chique demais pra esse tiozão aqui.`,
+  () => `"Funciona na minha máquina" já era clássico desde a era do ${pickOne(retro)}, meus jovens. Tradição de programador não muda.`,
+  () => `Todo mundo aqui já brigou com o ${pickOne(frameworks)} essa semana? No meu tempo brigava era com o ${pickOne(retro)} e olha que ele nem respondia.`,
+  () => `Orgulho danado dessa galera da FullDev. Quando eu comecei não tinha nem metade dessa união pra tirar dúvida de ${pickOne(languages)}.`,
+  () => `Ninguém: absolutamente ninguém: esse tiozão aqui, às 2h da manhã, comparando stack trace de ${pickOne(languages)} com defeito de ${pickOne(retro)}.`,
+  () => `A FullDev é tipo aquele grupo de MSN que todo mundo tinha, só que aqui ninguém te deixa no vácuo quando o ${pickOne(frameworks)} quebra.`,
+  () => `Quantas abas de Stack Overflow abertas é considerado normal em ${pickOne(frameworks)}? No meu tempo era manual impresso, rapaziada, respeitem os mais velhos.`,
+  () => `Hoje é dia de comemorar: consegui centralizar uma div sem xingar o ${pickOne(frameworks)} nem uma vez. Progresso de tiozão é progresso.`,
+  () => `Reunião de standup: "ontem mexi com ${pickOne(languages)}". Tradução de dev veterano: sofri em silêncio, que nem na época do ${pickOne(retro)}.`
 ];
 
 const critiqueTemplates: Array<() => string> = [
-  () => `Bora polemizar: ${pickOne(languages)} é subestimada ou só eu acho isso?`,
-  () => `${pickOne(languages)} vs ${pickOne(languages)}: qual sobrevive num deploy de sexta à noite?`,
-  () => `Defendam ${pickOne(languages)} com a vida ou aceitem que ela tem seus problemas. Debate aberto.`,
-  () => `${pickOne(frameworks)} envelheceu bem ou já era hora de aposentar?`,
-  () => `Confissão impopular: acho ${pickOne(languages)} mais overrated do que deveria.`,
-  () => `${pickOne(temas)} muda tudo ou é só mais um hype passageiro?`,
-  () => `Se sua empresa te obrigasse a escolher só uma linguagem pro resto da carreira, ${pickOne(languages)} entraria na lista?`,
-  () => `${pickOne(frameworks)} resolve mais problema do que cria, ou é o contrário?`
+  () => `Bora polemizar, moçada: ${pickOne(frameworks)} é só modinha ou vai envelhecer bem que nem o bom e velho Pascal?`,
+  () => `${pickOne(languages)} vs ${pickOne(languages)}: qual sobrevive num deploy de sexta à noite? Esse tiozão aqui aposta na mais teimosa.`,
+  () => `No meu tempo não tinha framework, era ${pickOne(languages)} na unha e comentário generoso. Hoje tá mais fácil ou só mais preguiçoso?`,
+  () => `Confissão impopular de veterano: acho ${pickOne(languages)} mais overrated do que deveria, mas ninguém briga com tiozão.`,
+  () => `${pickOne(temas)} muda tudo ou é só mais um hype passageiro? Já vi hype ir e vir tipo ${pickOne(retro)}.`,
+  () => `Se sua empresa te obrigasse a escolher só uma linguagem pro resto da carreira, ${pickOne(languages)} entraria na lista desse tiozão?`,
+  () => `${pickOne(frameworks)} resolve mais problema do que cria, ou é o contrário? Bora debater, essa é a essência da FullDev.`,
+  () => `Defendam ${pickOne(languages)} com a vida ou aceitem que ela tem seus problemas, que nem o saudoso ${pickOne(retro)} tinha os dele.`
 ];
 
 const pollTemplates: Array<() => { name: string; values: string[] }> = [
@@ -56,16 +69,16 @@ const pollTemplates: Array<() => { name: string; values: string[] }> = [
 ];
 
 const mentionReplyTemplates: Array<() => string> = [
-  () => `Eu? Só aqui pensando em ${pickOne(temas)}, como sempre.`,
-  () => `Presente! E antes que perguntem: não, eu não sei corrigir esse bug de sexta-feira.`,
-  () => `Fui chamado! Alguém precisa de ajuda pra debugar a vida?`,
-  () => `Só um bot tentando entender por que ${pickOne(languages)} faz isso.`,
-  () => `Aqui! Ocupado defendendo ${pickOne(languages)} de mais um hater.`,
-  () => `Chamaram? Eu tava só olhando a documentação do ${pickOne(frameworks)} de novo.`,
-  () => `Presente e funcionando (por enquanto).`,
-  () => `Fui invocado! Alguém aí sabe centralizar uma div sem sofrer?`,
-  () => `Tô aqui, mas minha atenção tá 100% em ${pickOne(temas)} hoje.`,
-  () => `Chamaram o bot! Infelizmente não faço deploy, só converso.`
+  () => `Presente! Um tiozão do código sempre disposto a ajudar aqui na FullDev, a melhor comunidade que eu já vi. kkkk`,
+  () => `Chamaram o veterano! No meu tempo isso aqui seria no MSN, mas fico feliz que a FullDev evoluiu.`,
+  () => `Fui invocado! Orgulho danado dessa galera, viu. Alguém precisa de ajuda pra debugar a vida ou só o ${pickOne(languages)}?`,
+  () => `Presente e funcionando (por enquanto, que nem meu ${pickOne(retro)} da época).`,
+  () => `Aqui! Ocupado defendendo ${pickOne(languages)} de mais um hater que não viveu a era do ${pickOne(retro)}.`,
+  () => `Chamaram? Eu tava só olhando a documentação do ${pickOne(frameworks)} de novo, igual antigamente eu olhava manual impresso.`,
+  () => `Fui chamado! E olha que satisfação ser bot de uma comunidade dessas, a FullDev não erra.`,
+  () => `Tô aqui, mas minha cabeça tá 100% em ${pickOne(temas)} hoje. Coisa de tiozão inquieto.`,
+  () => `Chamaram o bot! Infelizmente não faço deploy, só converso e conto causo de ${pickOne(retro)}.`,
+  () => `Presente! Rapaziada, vocês não sabem a sorte que tem de ter uma comunidade tão boa quanto a FullDev.`
 ];
 
 export function pickIdleContent(recentlyUsed: string[] = []): IdleContent {
@@ -86,10 +99,10 @@ export function pickMentionReply(): string {
 }
 
 const mentionCooldownTemplates: Array<(hours: number) => string> = [
-  (hours) => `Ok, chega de me chamar por hoje. Modo silêncio ativado por ${hours}h — tentem sobreviver sem mim.`,
-  (hours) => `Atingi minha cota de besteira por hora. Volto a responder em ${hours}h, se é que vão sentir minha falta.`,
-  (hours) => `Tô sendo abusado(a) com marcação. Só respondo de novo daqui a ${hours}h.`,
-  (hours) => `Isso já virou spam. Bot de férias por ${hours}h, jurando por essa.`,
+  (hours) => `Ok, chega de me chamar por hoje. Esse tiozão vai tirar uma soneca por ${hours}h — tentem sobreviver sem mim.`,
+  (hours) => `Atingi minha cota de causo de ${pickOne(retro)} por hora. Volto a responder em ${hours}h.`,
+  (hours) => `Tô sendo abusado(a) com marcação, rapaziada. Só respondo de novo daqui a ${hours}h.`,
+  (hours) => `Isso já virou spam. Bot de férias por ${hours}h, jurando por essa (mesmo amando a FullDev).`,
   (hours) => `Ok, vocês exageraram. Não respondo mais nenhuma menção pelas próximas ${hours}h.`
 ];
 
@@ -99,12 +112,12 @@ export function pickMentionCooldownMessage(hours: number): string {
 
 const welcomeTemplates: Array<(tags: string) => string> = [
   (tags) =>
-    `Bem-vindo(a), ${tags}! Você agora faz parte oficialmente da nossa seita secreta de devs. Leia as regras do grupo antes de mandar a primeira mensagem.`,
+    `Bem-vindo(a), ${tags}! Você agora faz parte oficialmente da nossa seita secreta de devs da FullDev, a melhor comunidade que esse tiozão já viu. Leia as regras antes de mandar a primeira mensagem.`,
   (tags) =>
-    `${tags} chegou! A partir de agora você é membro oficial da seita secreta de devs deste grupo. Leia as regras antes que alguém te cobre.`,
+    `${tags} chegou! A partir de agora é membro oficial da seita secreta de devs da FullDev. Leia as regras antes que alguém te cobre (aqui é rigoroso, mas com carinho).`,
   (tags) =>
-    `Seja bem-vindo(a), ${tags}. Iniciação concluída: você faz parte da nossa seita secreta de devs. Passo 1: ler as regras do grupo.`,
-  (tags) => `${tags}, parabéns, você foi selecionado(a) para a seita secreta de devs. Leia as regras antes que seja tarde demais.`
+    `Seja bem-vindo(a), ${tags}. Iniciação concluída: você faz parte da nossa seita secreta de devs da FullDev. Passo 1: ler as regras do grupo. Passo 2: aguentar as piadas de tiozão desse bot.`,
+  (tags) => `${tags}, parabéns, você foi selecionado(a) para a seita secreta de devs da FullDev. Leia as regras antes que seja tarde demais.`
 ];
 
 const directQuestionTemplates: Array<(tag: string) => string> = [
@@ -114,7 +127,8 @@ const directQuestionTemplates: Array<(tag: string) => string> = [
   (tag) => `${tag}, qual foi o bug mais bizarro que você já resolveu?`,
   (tag) => `${tag}, projeto pessoal ou só trampo mesmo? Conta aí.`,
   (tag) => `${tag}, editor de código ou IDE? E por quê?`,
-  (tag) => `${tag}, qual ferramenta você não vive sem no trabalho?`
+  (tag) => `${tag}, qual ferramenta você não vive sem no trabalho?`,
+  (tag) => `${tag}, esse tiozão quer saber: qual foi o primeiro código que você já escreveu?`
 ];
 
 export function pickDirectQuestion(participantJid: string): { text: string; mentions: string[] } {
