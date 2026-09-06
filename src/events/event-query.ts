@@ -6,11 +6,6 @@ export type EventQuery = {
   location?: string;
 };
 
-// Detecting the question doesn't require the bot to be mentioned - it fires on any message in the
-// Events group that looks like someone asking about events, per explicit user instruction. Kept
-// deliberately narrow (must mention "evento(s)" plus a question marker) to avoid false positives on
-// casual chat that happens to use the word "evento".
-const questionWordPattern = /\b(tem|algum|alguma|quais|qual|quando|onde|cade|sabe|existe|havera|vai)\b/;
 const monthNamePattern = /\b(janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/i;
 // Best-effort, same spirit as the Luma title filter - captures the phrase after a location
 // preposition, then trims filler words off both ends. Won't handle every phrasing correctly.
@@ -41,15 +36,6 @@ const locationNoiseWords = new Set([
   "que",
   "vem"
 ]);
-
-export function isEventQuestion(text: string): boolean {
-  const normalized = normalizePart(text);
-  if (!/\bevento/.test(normalized)) {
-    return false;
-  }
-
-  return normalized.includes("?") || questionWordPattern.test(normalized);
-}
 
 export function extractMonth(text: string, referenceDate: Date): { month: number; year: number } | undefined {
   const normalized = normalizePart(text);
@@ -92,11 +78,10 @@ export function extractLocation(text: string): string | undefined {
   return candidate;
 }
 
-export function parseEventQuery(text: string, referenceDate: Date = new Date()): EventQuery | undefined {
-  if (!isEventQuestion(text)) {
-    return undefined;
-  }
-
+// The bot only ever calls this once it's already been @-mentioned in the Events group (see
+// event-qna-listener.ts), so there's no separate "does this look like a question" gate here -
+// any mention is treated as an event question, and this just extracts whatever criteria it can.
+export function parseEventQuery(text: string, referenceDate: Date = new Date()): EventQuery {
   const monthMatch = extractMonth(text, referenceDate);
   const textWithoutMonth = text.replace(monthNamePattern, " ");
   const location = extractLocation(textWithoutMonth);

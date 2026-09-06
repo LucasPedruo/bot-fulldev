@@ -55,18 +55,21 @@ const monthNames = [
 ];
 
 export function formatEventQueryReply(events: NormalizedEvent[], query: EventQuery): string {
-  const criteria = describeQueryCriteria(query);
-
   if (events.length === 0) {
-    return `Não encontrei eventos ${criteria} no que já descobri até agora.`;
+    return describeNoMatchMessage(query);
   }
 
-  const lines = [`Eventos ${criteria}:`, ""];
+  const lines = [describeQueryHeading(query), ""];
 
-  for (const event of events) {
-    lines.push(`• ${event.title} — ${formatDate(event.startDate)}${event.location ? ` (${event.location})` : ""}`);
-    lines.push(`  ${event.url}`);
-  }
+  events.forEach((event, index) => {
+    if (index > 0) {
+      lines.push("");
+    }
+
+    lines.push(`${index + 1}. ${event.title}`);
+    lines.push(`${formatDate(event.startDate)}${event.location ? ` — ${event.location}` : ""}`);
+    lines.push(event.url);
+  });
 
   return lines.join("\n");
 }
@@ -76,16 +79,32 @@ export function formatEventPromoDescription(event: NormalizedEvent): string {
   return lines.join("\n");
 }
 
-function describeQueryCriteria(query: EventQuery): string {
+function describeQueryHeading(query: EventQuery): string {
   if (query.month !== undefined) {
-    return `em ${monthNames[query.month]}${query.location ? ` em ${query.location}` : ""}`;
+    return `Eventos em ${monthNames[query.month]}${query.location ? ` em ${query.location}` : ""}:`;
   }
 
   if (query.location) {
-    return `em ${query.location}`;
+    return `Eventos em ${query.location}:`;
   }
 
-  return "próximos";
+  return "Eventos próximos:";
+}
+
+function describeNoMatchMessage(query: EventQuery): string {
+  if (query.month !== undefined && query.location) {
+    return `Não encontrei nenhum evento em ${monthNames[query.month]} em ${query.location}.`;
+  }
+
+  if (query.month !== undefined) {
+    return `Não encontrei nenhum evento em ${monthNames[query.month]}.`;
+  }
+
+  if (query.location) {
+    return `Não encontrei nenhum evento em ${query.location}.`;
+  }
+
+  return "Não encontrei nenhum evento registrado até agora.";
 }
 
 function formatDate(date?: Date): string {

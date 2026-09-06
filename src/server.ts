@@ -30,23 +30,20 @@ async function start(): Promise<void> {
     // incoming messages gets composed into a single dispatcher here - each one already filters by
     // its own configured group(s), so calling all of them per message is safe.
     const messageHandlers: Array<(message: WAMessage) => void | Promise<void>> = [];
+    const getBotJids = (): string[] => {
+      const user = whatsapp.getSocket()?.user;
+      return [user?.id, user?.lid].filter((jid): jid is string => Boolean(jid));
+    };
 
     // Both listeners feed data the scheduled feature also depends on (message counts, join/leave
     // counts for the daily summary), so they run whenever either networking feature is enabled.
     if (env.NETWORKING_IDLE_ENABLED || env.NETWORKING_SCHEDULED_ENABLED) {
-      messageHandlers.push(
-        createNetworkingMessageListener({
-          getBotJids: () => {
-            const user = whatsapp.getSocket()?.user;
-            return [user?.id, user?.lid].filter((jid): jid is string => Boolean(jid));
-          }
-        })
-      );
+      messageHandlers.push(createNetworkingMessageListener({ getBotJids }));
       whatsapp.setGroupParticipantsHandler(createNetworkingMembershipListener());
     }
 
     if (env.EVENTS_POLL_ENABLED) {
-      messageHandlers.push(createEventQnaListener());
+      messageHandlers.push(createEventQnaListener({ getBotJids }));
     }
 
     if (messageHandlers.length > 0) {

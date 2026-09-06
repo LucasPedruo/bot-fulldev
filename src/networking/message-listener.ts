@@ -1,4 +1,5 @@
-import { jidNormalizedUser, type WAMessage } from "@whiskeysockets/baileys";
+import type { WAMessage } from "@whiskeysockets/baileys";
+import { isBotMentioned } from "../shared/mentions.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
 import { mentionReplyService, type MentionReplyService } from "./mention-reply.service.js";
 import { NetworkingRepository } from "./networking.repository.js";
@@ -39,16 +40,8 @@ export function createNetworkingMessageListener(
       return;
     }
 
-    const botJids = options.getBotJids();
-    if (botJids.length === 0) {
-      return;
-    }
-
-    const mentionedJids = message.message?.extendedTextMessage?.contextInfo?.mentionedJid ?? [];
-    const normalizedBotJids = new Set(botJids.map(jidNormalizedUser));
-    const wasMentioned = mentionedJids.some((jid) => normalizedBotJids.has(jidNormalizedUser(jid)));
-
-    if (!wasMentioned) {
+    const mentionedJids = message.message?.extendedTextMessage?.contextInfo?.mentionedJid;
+    if (!isBotMentioned(mentionedJids, options.getBotJids())) {
       return;
     }
 

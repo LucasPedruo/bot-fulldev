@@ -43,15 +43,15 @@ class FakeQueue implements QueueServiceLike {
 
 const group = "120363429019612420@g.us";
 
-void test("handleMessage ignores a message that isn't an event question", async () => {
+void test("handleMessage answers with the nearest upcoming events when the message has no criteria", async () => {
   const repository = new FakeRepository();
   const queue = new FakeQueue();
   const service = new EventQnaService(repository, queue);
 
-  const handled = await service.handleMessage(group, "bom dia pessoal");
+  await service.handleMessage(group, "e ai, bora?");
 
-  assert.equal(handled, false);
-  assert.equal(queue.enqueued.length, 0);
+  assert.deepEqual(repository.calls, [{ month: undefined, year: undefined, locationContains: undefined }]);
+  assert.equal(queue.enqueued.length, 1);
 });
 
 void test("handleMessage queries by month and replies in the events group", async () => {
@@ -59,9 +59,8 @@ void test("handleMessage queries by month and replies in the events group", asyn
   const queue = new FakeQueue();
   const service = new EventQnaService(repository, queue, () => new Date(2026, 8, 6));
 
-  const handled = await service.handleMessage(group, "tem evento em outubro?");
+  await service.handleMessage(group, "tem evento em outubro?");
 
-  assert.equal(handled, true);
   assert.deepEqual(repository.calls, [{ month: 9, year: 2026, locationContains: undefined }]);
   assert.equal(queue.enqueued.length, 1);
   assert.equal(queue.enqueued[0].destinationGroup, group);

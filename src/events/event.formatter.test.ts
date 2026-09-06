@@ -40,14 +40,20 @@ void test("formatEventReminderMessage varies the intro per notification type", (
   assert.match(formatEventReminderMessage(baseEvent, "event_today"), /Hoje é Gophercon/);
 });
 
-void test("formatEventQueryReply lists matching events with date, location and url", () => {
+void test("formatEventQueryReply lists matching events with date, location and url, each on its own block", () => {
   const message = formatEventQueryReply([baseEvent], { month: 8 });
 
   assert.match(message, /Eventos em setembro:/);
-  assert.match(message, /Gophercon LATAM 2026/);
-  assert.match(message, /02\/09\/2026/);
-  assert.match(message, /Florianópolis\/SC/);
+  assert.match(message, /1\. Gophercon LATAM 2026/);
+  assert.match(message, /02\/09\/2026 — Florianópolis\/SC/);
   assert.match(message, /https:\/\/gopherconlatam\.org\//);
+});
+
+void test("formatEventQueryReply separates multiple events with a blank line", () => {
+  const secondEvent: PersistedEvent = { ...baseEvent, id: "2", title: "TDC Summit", url: "https://thedevconf.com/" };
+  const message = formatEventQueryReply([baseEvent, secondEvent], {});
+
+  assert.match(message, /1\. Gophercon LATAM 2026[\s\S]*\n\n2\. TDC Summit/);
 });
 
 void test("formatEventQueryReply combines month and location in the criteria description", () => {
@@ -63,9 +69,10 @@ void test("formatEventQueryReply falls back to a generic label with no criteria"
 });
 
 void test("formatEventQueryReply returns a not-found message when there are no matches", () => {
-  const message = formatEventQueryReply([], { location: "Curitiba" });
-
-  assert.match(message, /Não encontrei eventos em Curitiba/);
+  assert.match(formatEventQueryReply([], { location: "Curitiba" }), /Não encontrei nenhum evento em Curitiba\./);
+  assert.match(formatEventQueryReply([], { month: 8 }), /Não encontrei nenhum evento em setembro\./);
+  assert.match(formatEventQueryReply([], { month: 8, location: "Curitiba" }), /Não encontrei nenhum evento em setembro em Curitiba\./);
+  assert.match(formatEventQueryReply([], {}), /Não encontrei nenhum evento registrado até agora\./);
 });
 
 void test("formatEventPromoDescription includes location and source", () => {

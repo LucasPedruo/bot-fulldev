@@ -1,18 +1,22 @@
 import type { WAMessage } from "@whiskeysockets/baileys";
+import { isBotMentioned } from "../shared/mentions.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
 import { eventQnaService, type EventQnaService } from "./event-qna.service.js";
 
 export type EventQnaServiceLike = Pick<EventQnaService, "handleMessage">;
 
 export type EventQnaListenerOptions = {
+  // Same LID-vs-phone-number JID caveat as the networking mention listener - both must be
+  // supplied so a mention is recognized regardless of which one WhatsApp used.
+  getBotJids: () => string[];
   eventsGroup?: string;
   service?: EventQnaServiceLike;
 };
 
-// No @mention required, per explicit user instruction - any message in the Events group that
-// looks like a question about events (month or location) gets answered. Detection itself lives in
-// event-query.ts and stays conservative enough to skip plain chat.
-export function createEventQnaListener(options: EventQnaListenerOptions = {}): (message: WAMessage) => Promise<void> {
+// Requires an explicit @-mention of the bot - an earlier version answered any message that merely
+// looked like a question, which false-triggered on unrelated chat that happened to contain
+// "evento" and a question mark.
+export function createEventQnaListener(options: EventQnaListenerOptions): (message: WAMessage) => Promise<void> {
   const service = options.service ?? eventQnaService;
 
   return async function handleIncomingMessage(message: WAMessage): Promise<void> {
@@ -27,6 +31,11 @@ export function createEventQnaListener(options: EventQnaListenerOptions = {}): (
 
     const eventsGroup = options.eventsGroup ?? getConfiguredWhatsAppGroups().eventsGroup;
     if (!eventsGroup || remoteJid !== eventsGroup) {
+      return;
+    }
+
+    const mentionedJids = message.message?.extendedTextMessage?.contextInfo?.mentionedJid;
+    if (!isBotMentioned(mentionedJids, options.getBotJids())) {
       return;
     }
 

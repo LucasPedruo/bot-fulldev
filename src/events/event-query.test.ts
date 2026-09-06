@@ -1,13 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { extractLocation, extractMonth, isEventQuestion, parseEventQuery } from "./event-query.js";
-
-void test("isEventQuestion requires both the word evento and a question marker", () => {
-  assert.equal(isEventQuestion("tem evento em setembro?"), true);
-  assert.equal(isEventQuestion("quais eventos tem esse mes"), true);
-  assert.equal(isEventQuestion("adorei o evento de ontem!"), false);
-  assert.equal(isEventQuestion("alguem sabe que horas sao?"), false);
-});
+import { extractLocation, extractMonth, parseEventQuery } from "./event-query.js";
 
 void test("extractMonth resolves a named month to this year when it hasn't passed yet", () => {
   const referenceDate = new Date(2026, 8, 6); // September 6th 2026
@@ -36,8 +29,8 @@ void test("extractLocation returns undefined when the captured phrase is just a 
   assert.equal(extractLocation("tem evento em setembro?"), undefined);
 });
 
-void test("parseEventQuery returns undefined for a message that isn't an event question", () => {
-  assert.equal(parseEventQuery("bom dia pessoal"), undefined);
+void test("parseEventQuery returns an empty-criteria object for a message with no month or location", () => {
+  assert.deepEqual(parseEventQuery("bom dia pessoal"), { month: undefined, year: undefined, location: undefined });
 });
 
 void test("parseEventQuery resolves month and location together, ignoring the double preposition", () => {
