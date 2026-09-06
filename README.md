@@ -327,12 +327,14 @@ NETWORKING_MENTION_COOLDOWN_HOURS=2
 
 As respostas de mencao continuam por template por padrao (`pickMentionReply`), mas podem opcionalmente usar uma IA de verdade via [Groq](https://console.groq.com) — API gratuita e compativel com o formato da OpenAI (`chat/completions`), sem cartao de credito, com limite de taxa (~30 req/min) muito acima do que essa feature usa (no maximo `NETWORKING_MENTION_MAX_PER_HOUR` por grupo). Comparado com o free tier do Gemini, cuja politica publica diz que humanos podem revisar/usar o conteudo pra treinar o modelo, o Groq (hospeda modelos abertos, nao treina os proprios) nao documenta essa pratica — mais adequado pra conteudo de um grupo real. OpenAI nao tem free tier de API (so o ChatGPT web e gratis, a API cobra desde o primeiro request).
 
-`MentionAiProvider` (`src/networking/mention-ai.provider.ts`) manda o texto de quem mencionou o bot como contexto (`buildMentionPrompt`) com um system prompt fixando o tom (engraçado, autodepreciativo, PT-BR, uma frase curta). Qualquer falha (sem chave configurada, timeout de 10s, rate limit, resposta vazia) cai automaticamente pro template normal — nunca trava nem derruba a resposta.
+`generateMentionReply` (`src/networking/mention-ai.provider.ts`) manda o texto de quem mencionou o bot como contexto (`buildMentionPrompt`) com um system prompt fixando o tom: "dev tiozão" (programador veterano, piadas old-school de disquete/internet discada/MSN) e fã da comunidade FullDev — o mesmo personagem usado nos templates de `idle-content.ts`. Qualquer falha (sem chave configurada, timeout de 10s, rate limit, HTTP de erro, resposta vazia) cai automaticamente pro template normal — nunca trava nem derruba a resposta.
+
+**Cuidado com o modelo:** o catalogo de modelos do Groq muda com frequencia — `llama-3.3-70b-versatile` (usado numa versao anterior) foi descontinuado e passou a devolver erro `model_not_found` silenciosamente absorvido pelo fallback, então o recurso ficou sempre caindo pro template sem nenhum aviso visivel. Troque de tempos em tempos pra confirmar que `GROQ_MODEL` ainda existe: `curl https://api.groq.com/openai/v1/models -H "authorization: Bearer $GROQ_API_KEY"`. O modelo atual (`openai/gpt-oss-20b`) é um modelo de raciocinio: ele gasta parte do token budget "pensando" num campo `reasoning` separado antes de escrever a resposta final — por isso o payload manda `reasoning_effort: "low"` e `max_tokens: 200` (nao só 80), senão a resposta final vem vazia (o modelo gasta tudo pensando e nunca chega a responder).
 
 ```env
 MENTION_REPLY_AI_ENABLED=false
 GROQ_API_KEY=
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=openai/gpt-oss-20b
 ```
 
 Pra ativar: crie uma chave gratuita em [console.groq.com](https://console.groq.com/keys), coloque em `GROQ_API_KEY` e mude `MENTION_REPLY_AI_ENABLED` pra `true`.
@@ -408,12 +410,15 @@ Lembretes automaticos em 7 dias, 3 dias, 1 dia (amanha) e no dia do evento, uma 
 
 **Perguntar sobre eventos**: **marcando o bot** com `@` no grupo de Eventos (ex.: "@bot tem evento em outubro?", "@bot tem evento em Recife?"), ele responde com o que ja esta no banco por mes e/ou localidade — parsing best-effort do texto (`src/events/event-query.ts`), consultando `EventRepository.query()` via `EventQnaService`. Sem mencionar o bot, nenhuma mensagem do grupo recebe resposta (uma versao anterior respondia a qualquer mensagem que parecesse pergunta e disparava sem querer com conversa comum contendo a palavra "evento" - corrigido pra exigir a mencao). Uma mencao sem mes/local especifico (so "@bot tem evento?") lista os proximos eventos cadastrados.
 
+**Limpeza automatica**: todo dia as `EVENT_CLEANUP_TIME` (padrao 03:00), `EventCleanupScheduler` apaga do banco qualquer evento cuja data ja passou (comparado contra o dia civil em `America/Sao_Paulo`) — `EventRepository.deleteExpired`. Eventos "a definir" (sem `startDate`) nunca sao apagados por essa rotina, ja que nao ha data pra julgar se venceram. A tabela `event_notifications` tem `ON DELETE CASCADE` na FK pra `events`, entao apagar o evento limpa as notificacoes junto, sem violar a constraint.
+
 ```env
 EVENTS_POLL_INTERVAL_MINUTES=15
 EVENTS_POLL_ENABLED=false
 EVENTS_MAX_PER_DAY=10
 EVENT_REMINDER_TIME=09:00
 EVENT_PROMO_TIME=10:00
+EVENT_CLEANUP_TIME=03:00
 AGENDA_TECH_BRASIL_EVENTS_ENABLED=true
 LUMA_EVENTS_ENABLED=false
 EVENTOSTI_DEV_EVENTS_ENABLED=false

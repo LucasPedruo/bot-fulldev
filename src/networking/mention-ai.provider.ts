@@ -35,22 +35,32 @@ export async function generateMentionReply(messageText?: string): Promise<string
       },
       body: JSON.stringify({
         model: env.GROQ_MODEL,
+        // gpt-oss models (the current default) spend part of the token budget "thinking" in a
+        // separate reasoning field before writing the actual reply - low effort plus a generous
+        // token budget leaves enough room for both, or the reply comes back empty.
+        reasoning_effort: "low",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: buildMentionPrompt(messageText) }
         ],
-        max_tokens: 80,
+        max_tokens: 200,
         temperature: 0.9
       })
     });
 
     if (!response.ok) {
-      throw new Error(`Groq request failed with HTTP ${response.status}`);
+      throw new Error(`Groq request failed with HTTP ${response.status}: ${await response.text()}`);
     }
 
     const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const text = data.choices?.[0]?.message?.content?.trim();
-    return text && text.length > 0 ? text : undefined;
+
+    if (!text) {
+      logger.warn({ data }, "Groq returned an empty reply, falling back to template");
+      return undefined;
+    }
+
+    return text;
   } catch (err) {
     logger.warn({ err }, "Groq mention reply generation failed, falling back to template");
     return undefined;

@@ -71,6 +71,13 @@
       "when": 1788727115404,
       "tag": "0009_careful_absorbing_man",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788731952287,
+      "tag": "0010_silky_mesmero",
+      "breakpoints": true
     }
   ]
 }

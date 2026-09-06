@@ -186,7 +186,7 @@ export const eventNotifications = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     eventId: uuid("event_id")
       .notNull()
-      .references(() => events.id),
+      .references(() => events.id, { onDelete: "cascade" }),
     type: eventNotificationType("type").notNull(),
     sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow()
   },

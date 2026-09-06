@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, ilike, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, isNotNull, lt, or, sql } from "drizzle-orm";
 import { db } from "../database/client.js";
 import { eventNotifications, events } from "../database/schema.js";
 import type { EventNotificationType, NormalizedEvent, PersistedEvent } from "./event.types.js";
@@ -96,6 +96,17 @@ export class EventRepository {
       .limit(filter.limit ?? 5);
 
     return rows.map(toPersistedEvent);
+  }
+
+  // Events with no startDate (TBA) never expire - there's no date to judge them by. Deleting
+  // cascades to event_notifications via its FK's onDelete: "cascade".
+  async deleteExpired(before: Date): Promise<number> {
+    const rows = await db
+      .delete(events)
+      .where(and(isNotNull(events.startDate), lt(events.startDate, before)))
+      .returning({ id: events.id });
+
+    return rows.length;
   }
 }
 

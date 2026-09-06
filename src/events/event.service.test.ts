@@ -32,12 +32,14 @@ class FakeProvider implements EventProvider {
 class FakeRepository implements EventRepositoryLike {
   public notifications: Array<{ eventId: string; type: EventNotificationType }> = [];
   public startingOnCalls: Date[] = [];
+  public deleteExpiredCalls: Date[] = [];
 
   constructor(
     private readonly duplicate?: PersistedEvent,
     private readonly discoveredToday = 0,
     private readonly eventsStartingOn: PersistedEvent[] = [],
-    private readonly notificationAlreadySent = false
+    private readonly notificationAlreadySent = false,
+    private readonly expiredCount = 0
   ) {}
 
   async countDiscoveredSince(): Promise<number> {
@@ -65,6 +67,12 @@ class FakeRepository implements EventRepositoryLike {
     await Promise.resolve();
     this.startingOnCalls.push(date);
     return this.eventsStartingOn;
+  }
+
+  async deleteExpired(before: Date): Promise<number> {
+    await Promise.resolve();
+    this.deleteExpiredCalls.push(before);
+    return this.expiredCount;
   }
 }
 
@@ -275,4 +283,16 @@ void test("sendPromotions skips the mention-all message when listing participant
 
   assert.equal(result.sent, 1);
   assert.equal(queue.enqueued.length, 2);
+});
+
+void test("cleanupExpiredEvents deletes events dated before today", async () => {
+  const repository = new FakeRepository(undefined, 0, [], false, 3);
+  const queue = new FakeQueue();
+  const service = new EventService([], repository, queue, () => new Date(2026, 8, 6, 15, 30));
+
+  const result = await service.cleanupExpiredEvents();
+
+  assert.equal(result.deleted, 3);
+  assert.equal(repository.deleteExpiredCalls.length, 1);
+  assert.deepEqual(repository.deleteExpiredCalls[0], new Date(2026, 8, 6, 0, 0, 0, 0));
 });

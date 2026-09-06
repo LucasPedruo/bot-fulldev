@@ -8,6 +8,7 @@ import { createJobQnaListener } from "./jobs/job-qna-listener.js";
 import { createNetworkingMembershipListener } from "./networking/membership-listener.js";
 import { createNetworkingMessageListener } from "./networking/message-listener.js";
 import { queueWorker } from "./queue/queue.worker.js";
+import { eventCleanupScheduler } from "./scheduler/event-cleanup.scheduler.js";
 import { eventPromoScheduler } from "./scheduler/event-promo.scheduler.js";
 import { eventRemindersScheduler } from "./scheduler/event-reminders.scheduler.js";
 import { eventsScheduler } from "./scheduler/events.scheduler.js";
@@ -88,6 +89,7 @@ async function start(): Promise<void> {
       eventsScheduler.start();
       eventRemindersScheduler.start();
       eventPromoScheduler.start();
+      eventCleanupScheduler.start();
     } else {
       logger.info("Events scheduler disabled");
     }
@@ -108,6 +110,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   eventsScheduler.stop();
   eventRemindersScheduler.stop();
   eventPromoScheduler.stop();
+  eventCleanupScheduler.stop();
   queueWorker.stop();
   whatsapp.stop();
   await app.close();

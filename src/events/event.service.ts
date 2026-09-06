@@ -24,7 +24,7 @@ export type EventsPollResult = {
 
 export type EventRepositoryLike = Pick<
   EventRepository,
-  "countDiscoveredSince" | "findDuplicate" | "insert" | "recordNotification" | "findEventsStartingOn"
+  "countDiscoveredSince" | "findDuplicate" | "insert" | "recordNotification" | "findEventsStartingOn" | "deleteExpired"
 >;
 export type QueueServiceLike = {
   enqueue(input: Parameters<typeof queueService.enqueue>[0]): Promise<QueueMessage>;
@@ -215,6 +215,13 @@ export class EventService {
 
     const tags = eligible.map((jid) => `@${jid.split("@")[0]}`).join(" ");
     return { text: `Quem vai em "${eventTitle}"? Responde na enquete acima! ${tags}`, mentions: eligible };
+  }
+
+  // TBA events (no startDate) are never touched here - there's no date to judge them expired by.
+  async cleanupExpiredEvents(): Promise<{ deleted: number }> {
+    const deleted = await this.repository.deleteExpired(startOfDay(this.now()));
+    logger.info({ deleted }, "Expired events cleaned up");
+    return { deleted };
   }
 
   private async notifyNewEvent(event: PersistedEvent): Promise<number> {
