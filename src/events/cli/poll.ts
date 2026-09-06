@@ -1,12 +1,16 @@
 import { formatNewEventMessage } from "../event.formatter.js";
 import { AgendaTechBrasilProvider } from "../providers/agenda-tech-brasil.provider.js";
+import { EventostiDevProvider } from "../providers/eventosti-dev.provider.js";
+import { LumaProvider } from "../providers/luma.provider.js";
 import type { EventProvider } from "../providers/provider.interface.js";
 
 const providerArg = process.argv.find((arg) => arg.startsWith("--provider="));
 const providerName = providerArg?.split("=")[1] ?? "agendatechbrasil";
 
 const providersByName: Record<string, () => EventProvider> = {
-  agendatechbrasil: () => new AgendaTechBrasilProvider()
+  agendatechbrasil: () => new AgendaTechBrasilProvider(),
+  luma: () => new LumaProvider(),
+  eventostidev: () => new EventostiDevProvider()
 };
 
 if (process.argv.includes("--dry-run")) {

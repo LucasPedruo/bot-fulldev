@@ -7,6 +7,8 @@ import { formatEventReminderMessage, formatNewEventMessage } from "./event.forma
 import { EventRepository } from "./event.repository.js";
 import type { EventNotificationType, NormalizedEvent, PersistedEvent } from "./event.types.js";
 import { AgendaTechBrasilProvider } from "./providers/agenda-tech-brasil.provider.js";
+import { EventostiDevProvider } from "./providers/eventosti-dev.provider.js";
+import { LumaProvider } from "./providers/luma.provider.js";
 import type { EventProvider } from "./providers/provider.interface.js";
 
 export type EventsPollResult = {
@@ -146,5 +148,9 @@ function startOfDay(date: Date): Date {
 }
 
 function createDefaultProviders(): EventProvider[] {
-  return [new AgendaTechBrasilProvider()];
+  return [
+    ...(env.AGENDA_TECH_BRASIL_EVENTS_ENABLED ? [new AgendaTechBrasilProvider()] : []),
+    ...(env.LUMA_EVENTS_ENABLED ? [new LumaProvider()] : []),
+    ...(env.EVENTOSTI_DEV_EVENTS_ENABLED ? [new EventostiDevProvider()] : [])
+  ];
 }

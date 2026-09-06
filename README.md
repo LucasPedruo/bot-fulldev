@@ -362,13 +362,21 @@ MEMES_CHANCE=0.1
 
 Descobre e divulga eventos de tecnologia no grupo `WHATSAPP_EVENTS_GROUP`, com lembretes automaticos.
 
-APIs de descoberta automatica de eventos (Meetup, Eventbrite, Sympla, Lu.ma) foram avaliadas e descartadas — todas exigem plano pago, tiveram a busca publica descontinuada, ou restringem o acesso aos eventos do proprio organizador (mesma categoria de problema do LinkedIn pra vagas). A fonte usada e o [agenda-tech-brasil](https://github.com/agenda-tech-brasil/agenda-tech-brasil), um calendario de eventos tech no Brasil mantido pela comunidade (5.7k stars), consumido via um JSON estruturado real e publico que a automacao deles gera:
+APIs formais de descoberta de eventos (Meetup, Eventbrite, Sympla) foram avaliadas e descartadas — todas exigem plano pago, tiveram a busca publica descontinuada, ou restringem o acesso aos eventos do proprio organizador (mesma categoria de problema do LinkedIn pra vagas). Tres providers cobrem hoje, cada um habilitavel por env var independente (mesmo padrao dos providers de vagas):
+
+**AgendaTechBrasil** (`src/events/providers/agenda-tech-brasil.provider.ts`, `AGENDA_TECH_BRASIL_EVENTS_ENABLED`) — fonte principal. Consome o JSON estruturado publico do [agenda-tech-brasil](https://github.com/agenda-tech-brasil/agenda-tech-brasil), calendario de eventos tech no Brasil mantido pela comunidade (5.7k stars):
 
 ```text
 GET https://raw.githubusercontent.com/agenda-tech-brasil/agenda-tech-brasil/main/src/db/database.json
 ```
 
-`AgendaTechBrasilProvider` (`src/events/providers/agenda-tech-brasil.provider.ts`) ignora anos/meses ja arquivados e qualquer evento cuja data ja passou, monta um ID sintetico estavel (a fonte nao tem ID proprio) e mapeia presencial/online/hibrido. Eventos "a definir" (sem data) so recebem a notificacao de novo evento, nunca lembrete.
+Ignora anos/meses ja arquivados e qualquer evento cuja data ja passou, monta um ID sintetico estavel (a fonte nao tem ID proprio) e mapeia presencial/online/hibrido. Eventos "a definir" (sem data) so recebem a notificacao de novo evento, nunca lembrete.
+
+**Luma** (`src/events/providers/luma.provider.ts`, `LUMA_EVENTS_ENABLED`, desativado por padrao) — faz parse do `__NEXT_DATA__` (JSON embutido no HTML da pagina Next.js) das paginas de descoberta por cidade `luma.com/saopaulo` e `luma.com/rio` (unicos slugs de cidade brasileira confirmados; outros redirecionam pra uma pagina generica). O feed por cidade mistura todo tipo de evento (moda, financas, tech), entao um filtro de palavras-chave (`isTechEventTitle`, em `event.normalizer.ts`) descarta o que nao parece ser de tecnologia — best-effort, alguns eventos tech com nome muito abstrato podem passar despercebidos. **So dados do proprio evento sao extraidos (nome/data/local/link) — o payload da Luma tambem traz dados pessoais de anfitrioes e convidados confirmados (nome, foto, redes sociais) ao lado de cada evento, e essas chaves nunca sao lidas nem repassadas.**
+
+**EventostiDev** (`src/events/providers/eventosti-dev.provider.ts`, `EVENTOSTI_DEV_EVENTS_ENABLED`, desativado por padrao) — faz parse (via `cheerio`) dos cards da secao "Proximos Eventos" de `eventosti.dev`, um agregador exclusivamente de tecnologia (sem filtro de tema necessario, mesmo caso do AgendaTechBrasil). Volume baixo (poucos eventos cadastrados por vez).
+
+Sympla foi descartado como fonte de scraping: alem da mesma restricao de API do organizador, as paginas de evento usam React Server Components em streaming (sem `__NEXT_DATA__` ou JSON estavel), tornando o parsing impraticavel.
 
 Lembretes automaticos em 7 dias, 3 dias, 1 dia (amanha) e no dia do evento, uma vez por tipo por evento (nunca reenvia, controlado pela tabela `event_notifications`), comparando a data do evento (guardada em UTC) contra o dia civil em `America/Sao_Paulo`, as `EVENT_REMINDER_TIME` (padrao 09:00) via `EventRemindersScheduler`.
 
@@ -377,12 +385,17 @@ EVENTS_POLL_INTERVAL_MINUTES=15
 EVENTS_POLL_ENABLED=false
 EVENTS_MAX_PER_DAY=10
 EVENT_REMINDER_TIME=09:00
+AGENDA_TECH_BRASIL_EVENTS_ENABLED=true
+LUMA_EVENTS_ENABLED=false
+EVENTOSTI_DEV_EVENTS_ENABLED=false
 ```
 
-Validar sem salvar/enfileirar:
+Validar sem salvar/enfileirar (por padrao usa o AgendaTechBrasil; `--provider=luma` ou `--provider=eventostidev` testam os outros):
 
 ```bash
 npm run events:poll -- --dry-run
+npm run events:poll -- --dry-run --provider=luma
+npm run events:poll -- --dry-run --provider=eventostidev
 ```
 
 ## Endpoints
