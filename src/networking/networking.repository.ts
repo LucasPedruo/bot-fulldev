@@ -1,6 +1,6 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "../database/client.js";
-import { groupActivity, networkingTopicHistory } from "../database/schema.js";
+import { groupActivity, mentionReplyLog, networkingTopicHistory } from "../database/schema.js";
 
 export type NetworkingTopicType = "joke" | "poll" | "critique" | "news";
 
@@ -30,6 +30,31 @@ export class NetworkingRepository {
       .limit(limit);
 
     return rows.map((row) => row.content);
+  }
+
+  async getMentionMuteUntil(groupJid: string): Promise<Date | undefined> {
+    const [row] = await db.select().from(groupActivity).where(eq(groupActivity.groupJid, groupJid)).limit(1);
+    return row?.mentionMuteUntil ?? undefined;
+  }
+
+  async setMentionMuteUntil(groupJid: string, until: Date): Promise<void> {
+    await db
+      .insert(groupActivity)
+      .values({ groupJid, mentionMuteUntil: until })
+      .onConflictDoUpdate({ target: groupActivity.groupJid, set: { mentionMuteUntil: until } });
+  }
+
+  async recordMentionReply(groupJid: string, at: Date = new Date()): Promise<void> {
+    await db.insert(mentionReplyLog).values({ groupJid, repliedAt: at });
+  }
+
+  async countRecentMentionReplies(groupJid: string, since: Date): Promise<number> {
+    const [row] = await db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(mentionReplyLog)
+      .where(and(eq(mentionReplyLog.groupJid, groupJid), gte(mentionReplyLog.repliedAt, since)));
+
+    return row?.value ?? 0;
   }
 }
 

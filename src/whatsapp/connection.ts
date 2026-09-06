@@ -4,6 +4,7 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
+  type BaileysEventMap,
   type GroupMetadata,
   type WAMessage,
   type WASocket
@@ -31,6 +32,7 @@ export class WhatsAppConnectionManager {
   private reconnectAttempts = 0;
   private stopping = false;
   private messageHandler?: (message: WAMessage) => void | Promise<void>;
+  private groupParticipantsHandler?: (update: BaileysEventMap["group-participants.update"]) => void | Promise<void>;
   private readonly authDir: string;
   private readonly log: Logger;
 
@@ -49,6 +51,10 @@ export class WhatsAppConnectionManager {
 
   setMessageHandler(handler: (message: WAMessage) => void | Promise<void>): void {
     this.messageHandler = handler;
+  }
+
+  setGroupParticipantsHandler(handler: (update: BaileysEventMap["group-participants.update"]) => void | Promise<void>): void {
+    this.groupParticipantsHandler = handler;
   }
 
   async start(): Promise<void> {
@@ -81,17 +87,11 @@ export class WhatsAppConnectionManager {
     });
     this.socket.ev.on("messages.upsert", (update) => {
       for (const message of update.messages) {
-        try {
-          const result = this.messageHandler?.(message);
-          if (result instanceof Promise) {
-            result.catch((error: unknown) => {
-              this.log.error({ err: error }, "Message handler failed");
-            });
-          }
-        } catch (error) {
-          this.log.error({ err: error }, "Message handler failed");
-        }
+        this.invokeHandler(this.messageHandler, message, "Message handler failed");
       }
+    });
+    this.socket.ev.on("group-participants.update", (update) => {
+      this.invokeHandler(this.groupParticipantsHandler, update, "Group participants handler failed");
     });
     this.socket.ev.on("connection.update", (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -168,6 +168,19 @@ export class WhatsAppConnectionManager {
     const socket = this.requireConnectedSocket();
     await socket.sendMessage(destinationJid, { poll: { name, values, selectableCount } });
     this.log.info({ destinationJid, optionsCount: values.length }, "WhatsApp poll sent");
+  }
+
+  private invokeHandler<T>(handler: ((arg: T) => void | Promise<void>) | undefined, arg: T, errorMessage: string): void {
+    try {
+      const result = handler?.(arg);
+      if (result instanceof Promise) {
+        result.catch((error: unknown) => {
+          this.log.error({ err: error }, errorMessage);
+        });
+      }
+    } catch (error) {
+      this.log.error({ err: error }, errorMessage);
+    }
   }
 
   private requireConnectedSocket(): WASocket {

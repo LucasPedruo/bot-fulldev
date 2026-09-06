@@ -92,8 +92,19 @@ export const jobDeliveries = pgTable(
 
 export const groupActivity = pgTable("group_activity", {
   groupJid: text("group_jid").primaryKey(),
-  lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow()
+  lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
+  mentionMuteUntil: timestamp("mention_mute_until", { withTimezone: true })
 });
+
+export const mentionReplyLog = pgTable(
+  "mention_reply_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    groupJid: text("group_jid").notNull(),
+    repliedAt: timestamp("replied_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [index("mention_reply_log_group_replied_idx").on(table.groupJid, table.repliedAt)]
+);
 
 export const networkingTopicType = pgEnum("networking_topic_type", ["joke", "poll", "critique", "news"]);
 

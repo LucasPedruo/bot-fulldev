@@ -2,6 +2,7 @@ import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
 import { closeDatabase } from "./database/client.js";
 import { runMigrations } from "./database/migrate.js";
+import { createNetworkingMembershipListener } from "./networking/membership-listener.js";
 import { createNetworkingMessageListener } from "./networking/message-listener.js";
 import { queueWorker } from "./queue/queue.worker.js";
 import { jobsScheduler } from "./scheduler/jobs.scheduler.js";
@@ -21,6 +22,7 @@ async function start(): Promise<void> {
 
     if (env.NETWORKING_IDLE_ENABLED) {
       whatsapp.setMessageHandler(createNetworkingMessageListener({ getBotJid: () => whatsapp.getSocket()?.user?.id }));
+      whatsapp.setGroupParticipantsHandler(createNetworkingMembershipListener());
     }
 
     if (env.WHATSAPP_AUTO_CONNECT) {

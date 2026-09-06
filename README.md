@@ -287,18 +287,23 @@ docker compose exec app node dist/jobs/cli/poll.js
 
 Nenhuma mensagem do bot sai entre `QUIET_HOURS_START` e `QUIET_HOURS_END` (padrao 00:00-07:00), independente do tipo (vaga, evento, networking, manual). A regra fica num unico lugar, `QueueWorker.processOne` (`src/queue/queue.worker.ts`), que se recusa a reivindicar qualquer mensagem da fila enquanto `isQuietHours` (`src/shared/quiet-hours.ts`) for verdadeiro. Mensagens agendadas para a madrugada continuam `pending` e saem automaticamente assim que a janela termina — nenhum outro modulo (scheduler, service, listener) precisa se preocupar com isso.
 
-## Networking: ociosidade e mencoes
+## Networking: ociosidade, mencoes e entrada/saida
 
-Os 2 grupos de Networking configurados tem duas automacoes reativas:
+Os 2 grupos de Networking configurados tem automacoes reativas:
 
 - **Ociosidade**: se um grupo ficar `NETWORKING_IDLE_THRESHOLD_MINUTES` (padrao 60) sem nenhuma mensagem, o bot puxa assunto — piada, critica de linguagem, enquete (poll nativo do WhatsApp) ou, ocasionalmente, uma noticia real de tech via [Dev.to API](https://developers.forem.com/api) (`GET https://dev.to/api/articles?top=1`, publica, sem chave). Verificado a cada `NETWORKING_IDLE_CHECK_INTERVAL_MINUTES` (padrao 10) via `NetworkingIdleScheduler` (`src/scheduler/networking-idle.scheduler.ts`).
-- **Mencao**: se alguem mencionar o bot com `@` num desses grupos, ele responde com uma besteira e menciona a pessoa de volta.
+- **Mencao**: se alguem mencionar o bot com `@` num desses grupos, ele responde com uma besteira e menciona a pessoa de volta — com limite (veja abaixo).
+- **Entrada/saida**: quem entra num grupo de Networking recebe boas-vindas mencionando a pessoa ("seita secreta", ler as regras); quem sai leva uma mensagem iconica de despedida (HB20, Vasco, etc.), sem mencao.
 
-Conteudo gerado por **templates com partes variaveis** (linguagem/framework/tema sorteados), sem IA generativa — decisao explicita para nao gastar token. `src/networking/idle-content.ts` guarda os moldes; `NetworkingRepository` (`group_activity`, `networking_topic_history`) evita repetir os ultimos usados por grupo e guarda o timestamp da ultima atividade real (atualizado por um listener de `messages.upsert` no Baileys, que hoje nao existia).
+Conteudo gerado por **templates com partes variaveis** (linguagem/framework/tema sorteados), sem IA generativa — decisao explicita para nao gastar token. `src/networking/idle-content.ts` guarda todos os moldes (topicos, mencoes, boas-vindas, despedidas). `NetworkingRepository` (`group_activity`, `networking_topic_history`, `mention_reply_log`) evita repetir os ultimos usados por grupo e guarda o timestamp da ultima atividade real (atualizado por um listener de `messages.upsert` no Baileys, que hoje nao existia) e o estado de limite de mencoes.
 
 Postar um topico de ociosidade **reseta o relogio de silencio** daquele grupo (evita disparar de novo antes de completar mais uma hora real de silencio).
 
-Desligado por padrao (`NETWORKING_IDLE_ENABLED=false`):
+### Limite de mencoes
+
+Sem limite, o grupo poderia spammar mencionando o bot repetidamente. `NETWORKING_MENTION_MAX_PER_HOUR` (padrao 5) conta quantas respostas a mencao o bot ja deu num grupo na ultima hora corrida (`mention_reply_log`); ao atingir o limite, em vez da besteira normal ele responde uma unica vez de forma ironica avisando que vai ficar em silencio por `NETWORKING_MENTION_COOLDOWN_HOURS` (padrao 2) e entra em modo mudo de verdade — nenhuma mencao nova recebe resposta ate o prazo passar, mesmo que continuem chamando (`MentionReplyService`, `src/networking/mention-reply.service.ts`). Como a resposta tambem passa pela fila normal, uma mencao feita de madrugada so e respondida depois que a janela de silencio noturno terminar, nunca durante ela.
+
+Desligado por padrao (`NETWORKING_IDLE_ENABLED=false`) — a mesma flag liga ociosidade, mencoes e entrada/saida:
 
 ```env
 QUIET_HOURS_START=00:00
@@ -306,6 +311,8 @@ QUIET_HOURS_END=07:00
 NETWORKING_IDLE_ENABLED=false
 NETWORKING_IDLE_THRESHOLD_MINUTES=60
 NETWORKING_IDLE_CHECK_INTERVAL_MINUTES=10
+NETWORKING_MENTION_MAX_PER_HOUR=5
+NETWORKING_MENTION_COOLDOWN_HOURS=2
 ```
 
 ## Endpoints

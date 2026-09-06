@@ -85,6 +85,48 @@ export function pickMentionReply(): string {
   return pickOne(mentionReplyTemplates)();
 }
 
+const mentionCooldownTemplates: Array<(hours: number) => string> = [
+  (hours) => `Ok, chega de me chamar por hoje. Modo silêncio ativado por ${hours}h — tentem sobreviver sem mim.`,
+  (hours) => `Atingi minha cota de besteira por hora. Volto a responder em ${hours}h, se é que vão sentir minha falta.`,
+  (hours) => `Tô sendo abusado(a) com marcação. Só respondo de novo daqui a ${hours}h.`,
+  (hours) => `Isso já virou spam. Bot de férias por ${hours}h, jurando por essa.`,
+  (hours) => `Ok, vocês exageraram. Não respondo mais nenhuma menção pelas próximas ${hours}h.`
+];
+
+export function pickMentionCooldownMessage(hours: number): string {
+  return pickOne(mentionCooldownTemplates)(hours);
+}
+
+const welcomeTemplates: Array<(tags: string) => string> = [
+  (tags) =>
+    `Bem-vindo(a), ${tags}! Você agora faz parte oficialmente da nossa seita secreta de devs. Leia as regras do grupo antes de mandar a primeira mensagem.`,
+  (tags) =>
+    `${tags} chegou! A partir de agora você é membro oficial da seita secreta de devs deste grupo. Leia as regras antes que alguém te cobre.`,
+  (tags) =>
+    `Seja bem-vindo(a), ${tags}. Iniciação concluída: você faz parte da nossa seita secreta de devs. Passo 1: ler as regras do grupo.`,
+  (tags) => `${tags}, parabéns, você foi selecionado(a) para a seita secreta de devs. Leia as regras antes que seja tarde demais.`
+];
+
+export function buildWelcomeMessage(participantJids: string[]): { text: string; mentions: string[] } {
+  const tags = participantJids.map((jid) => `@${jid.split("@")[0]}`).join(" ");
+  return { text: pickOne(welcomeTemplates)(tags), mentions: participantJids };
+}
+
+const goodbyeTemplates = [
+  "Puxa, não foi dessa vez que você conseguiu, mas não desista. Ligue somente durante o programa...",
+  "Saiu, perdeu o sorteio do HB20.",
+  "Esse foi de Vasco.",
+  "Menos um pra competir na vaga de júnior.",
+  "Foi um prazer, ou não. Baita call.",
+  "Mais um que preferiu produção sem testes.",
+  "Partiu sem dar merge na branch. Descanse em paz.",
+  "Deletou a conta com a mesma coragem de quem faz force push na main."
+];
+
+export function pickGoodbyeMessage(): string {
+  return pickOne(goodbyeTemplates);
+}
+
 function generateOnce(): IdleContent {
   const type = pickOne(["joke", "critique", "poll"] as const);
 
