@@ -301,32 +301,28 @@ docker compose exec app node dist/jobs/cli/poll.js
 
 Nenhuma mensagem do bot sai entre `QUIET_HOURS_START` e `QUIET_HOURS_END` (padrao 00:00-07:00), independente do tipo (vaga, evento, networking, manual) — **exceto** mensagens marcadas explicitamente com `bypassQuietHours: true` ao enfileirar (coluna `bypass_quiet_hours` em `message_queue`). A regra fica num unico lugar, `QueueRepository.claimNext` (`src/queue/queue.repository.ts`): o `QueueWorker` (`src/queue/queue.worker.ts`) informa se `isQuietHours` (`src/shared/quiet-hours.ts`) esta ativo, e o `claimNext` so reivindica mensagens com o flag de bypass enquanto isso for verdade. Mensagens comuns agendadas para a madrugada continuam `pending` e saem automaticamente assim que a janela termina.
 
-Hoje só as mensagens de entrada/saida de grupo (`src/networking/membership-listener.ts`) usam esse bypass — são eventos reativos e de baixa frequência (não repetem sozinhos como um tópico de ociosidade ou uma vaga postada), então o usuário pediu para elas não esperarem a janela de silêncio passar. Novos usos do bypass devem seguir o mesmo criterio: só para algo que não vai se repetir/spammar.
+Hoje só as mensagens de entrada/saida de grupo (`src/networking/membership-listener.ts`) usam esse bypass — são eventos reativos e de baixa frequência (não repetem sozinhos como uma vaga postada), então o usuário pediu para elas não esperarem a janela de silêncio passar. Novos usos do bypass devem seguir o mesmo criterio: só para algo que não vai se repetir/spammar.
 
-## Networking: ociosidade, mencoes e entrada/saida
+## Networking: mencoes e entrada/saida
 
 Os 2 grupos de Networking configurados tem automacoes reativas:
 
-- **Ociosidade**: se um grupo ficar `NETWORKING_IDLE_THRESHOLD_MINUTES` (padrao 120, ou seja 2h) sem nenhuma mensagem, o bot puxa assunto — piada, critica de linguagem, enquete (poll nativo do WhatsApp), ocasionalmente uma noticia real de tech via [Dev.to API](https://developers.forem.com/api) (`GET https://dev.to/api/articles?top=1`, publica, sem chave), ou uma **pergunta direta marcando um participante real** do grupo (sorteado via `WhatsAppConnectionManager.listParticipants`, excluindo o proprio bot) — assim nem toda mensagem de ociosidade e uma pergunta solta no vazio. Verificado a cada `NETWORKING_IDLE_CHECK_INTERVAL_MINUTES` (padrao 10) via `NetworkingIdleScheduler` (`src/scheduler/networking-idle.scheduler.ts`).
 - **Mencao**: se alguem mencionar o bot com `@` num desses grupos, ele responde com uma besteira e menciona a pessoa de volta — com limite (veja abaixo). Opcionalmente com IA de verdade (veja "Resposta de mencao com IA" abaixo).
 - **Entrada/saida**: quem entra num grupo de Networking recebe boas-vindas mencionando a pessoa ("seita secreta", ler as regras); quem sai leva uma mensagem iconica de despedida (HB20, Vasco, etc.), sem mencao.
 
-Conteudo gerado por **templates com partes variaveis** (linguagem/framework/tema sorteados), sem IA generativa — decisao explicita para nao gastar token. `src/networking/idle-content.ts` guarda todos os moldes (topicos, mencoes, boas-vindas, despedidas). `NetworkingRepository` (`group_activity`, `networking_topic_history`, `mention_reply_log`) evita repetir os ultimos usados por grupo e guarda o timestamp da ultima atividade real (atualizado por um listener de `messages.upsert` no Baileys, que hoje nao existia) e o estado de limite de mencoes.
+> Removido a pedido do usuario (2026-09-07): o bot puxava assunto sozinho (piada, critica de linguagem, enquete, noticia via Dev.to, ou pergunta direta a um participante sorteado) sempre que um grupo ficava tempo demais sem mensagem. A feature (`NetworkingIdleService`, `NetworkingIdleScheduler`, integracao com a API do Dev.to) foi removida por completo, incluindo a tabela `networking_topic_history` (migration `0012`) — nao deixar essa ideia como flag desligada, foi uma remocao definitiva.
 
-Postar um topico de ociosidade **reseta o relogio de silencio** daquele grupo (evita disparar de novo antes de completar mais uma hora real de silencio).
+Conteudo gerado por **templates com partes variaveis** (linguagem/framework/tema sorteados), sem IA generativa — decisao explicita para nao gastar token. `src/networking/idle-content.ts` guarda os moldes que restam (mencoes, boas-vindas, despedidas — o nome do arquivo é um resquicio historico da feature de ociosidade acima). `NetworkingRepository` (`group_activity`, `mention_reply_log`) guarda o estado de limite de mencoes e a contagem de mensagens/dia usada nas estatisticas.
 
 ### Limite de mencoes
 
 Sem limite, o grupo poderia spammar mencionando o bot repetidamente. `NETWORKING_MENTION_MAX_PER_HOUR` (padrao 5) conta quantas respostas a mencao o bot ja deu num grupo na ultima hora corrida (`mention_reply_log`); ao atingir o limite, em vez da besteira normal ele responde uma unica vez de forma ironica avisando que vai ficar em silencio por `NETWORKING_MENTION_COOLDOWN_HOURS` (padrao 2) e entra em modo mudo de verdade — nenhuma mencao nova recebe resposta ate o prazo passar, mesmo que continuem chamando (`MentionReplyService`, `src/networking/mention-reply.service.ts`). Como a resposta tambem passa pela fila normal, uma mencao feita de madrugada so e respondida depois que a janela de silencio noturno terminar, nunca durante ela.
 
-Desligado por padrao (`NETWORKING_IDLE_ENABLED=false`) — a mesma flag liga ociosidade, mencoes e entrada/saida:
+Mencao e entrada/saida ficam atras de `NETWORKING_SCHEDULED_ENABLED` (veja "Networking programado" abaixo — hoje e a mesma flag que liga o listener de mensagens/participantes usado por ambas as features):
 
 ```env
 QUIET_HOURS_START=00:00
 QUIET_HOURS_END=07:00
-NETWORKING_IDLE_ENABLED=false
-NETWORKING_IDLE_THRESHOLD_MINUTES=120
-NETWORKING_IDLE_CHECK_INTERVAL_MINUTES=10
 NETWORKING_MENTION_MAX_PER_HOUR=5
 NETWORKING_MENTION_COOLDOWN_HOURS=2
 ```
@@ -351,7 +347,7 @@ Pra ativar: crie uma chave gratuita em [console.groq.com](https://console.groq.c
 
 ## Networking programado
 
-Diferente da ociosidade (reativa), estas sao mensagens em **horario fixo**, todo dia, controladas por `NETWORKING_SCHEDULED_ENABLED` (flag propria, independente de `NETWORKING_IDLE_ENABLED`):
+Estas sao mensagens em **horario fixo**, todo dia, controladas por `NETWORKING_SCHEDULED_ENABLED` — a mesma flag tambem liga o listener de mensagens/participantes usado pela mencao e pelas mensagens de entrada/saida (veja "Networking: mencoes e entrada/saida" acima):
 
 - **Spotlight** as `NETWORKING_MORNING_TIME`/`NETWORKING_LUNCH_TIME`/`NETWORKING_NIGHT_TIME` (08h/12h/20h por padrao): sorteia um participante real do grupo (via `WhatsAppConnectionManager.listParticipants`, novo, mesmo padrao de `listGroups`), exclui o proprio bot (telefone e LID — veja "Mencoes e LID" acima), evita repetir quem foi sorteado nas ultimas 24h (com fallback pro grupo inteiro se isso zerar as opcoes). Segunda e sexta usam moldes de mensagem proprios, diferentes do dia normal.
 - **Resumo real** as `NETWORKING_SUMMARY_TIME` (18h por padrao): ao inves de spotlight, posta um resumo com dados de verdade do dia — nao e texto generico. Ve a secao Estatisticas abaixo pros numeros exatos que entram nesse resumo.
@@ -520,4 +516,4 @@ Deliberadamente **manual** — nao ha webhook nem CI disparando isso sozinho. Te
 
 ## Proxima fase
 
-Todos os itens do roadmap original (vagas, ociosidade/mencoes/entrada-saida, networking programado, estatisticas, eventos) estao implementados - memes foi removido por escolha do usuario. Robustez de producao: backup/recuperacao dos volumes, deploy com healthcheck e alerta melhorado de sessao deslogada ja feitos (secoes acima). Protecao de endpoints administrativos e moot por enquanto (hoje so existem `/health` e `/ready`, sem autenticacao — so vira relevante quando algum endpoint de controle for adicionado). Falta o item mais importante: mover a execucao da maquina local pra uma VPS de verdade (hoje se o Docker Desktop do usuario cair ou o PC desligar, o bot fica offline) — aguardando o usuario provisionar uma VPS (ele pediu pra eu configurar tudo depois que ele criar a conta/servidor, ja que nao sabe fazer isso sozinho).
+Todos os itens do roadmap original (vagas, mencoes/entrada-saida, networking programado, estatisticas, eventos) estao implementados - memes e a feature de ociosidade (posts automaticos por tempo de silencio) foram removidos por escolha do usuario. Robustez de producao: backup/recuperacao dos volumes, deploy com healthcheck e alerta melhorado de sessao deslogada ja feitos (secoes acima). Protecao de endpoints administrativos e moot por enquanto (hoje so existem `/health` e `/ready`, sem autenticacao — so vira relevante quando algum endpoint de controle for adicionado). **VPS em producao desde 2026-09-07** (HostGator, `/opt/bot-fulldev`) - a execucao ja nao depende mais da maquina local do usuario.

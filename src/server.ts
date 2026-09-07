@@ -13,7 +13,6 @@ import { eventPromoScheduler } from "./scheduler/event-promo.scheduler.js";
 import { eventRemindersScheduler } from "./scheduler/event-reminders.scheduler.js";
 import { eventsScheduler } from "./scheduler/events.scheduler.js";
 import { jobsScheduler } from "./scheduler/jobs.scheduler.js";
-import { networkingIdleScheduler } from "./scheduler/networking-idle.scheduler.js";
 import { networkingScheduledScheduler } from "./scheduler/networking-scheduled.scheduler.js";
 import { logger } from "./shared/logger.js";
 import { whatsapp } from "./whatsapp/client.js";
@@ -37,9 +36,10 @@ async function start(): Promise<void> {
       return [user?.id, user?.lid].filter((jid): jid is string => Boolean(jid));
     };
 
-    // Both listeners feed data the scheduled feature also depends on (message counts, join/leave
-    // counts for the daily summary), so they run whenever either networking feature is enabled.
-    if (env.NETWORKING_IDLE_ENABLED || env.NETWORKING_SCHEDULED_ENABLED) {
+    // Both listeners feed data the scheduled feature depends on (message counts, join/leave counts
+    // for the daily summary, plus mention-reply/welcome-goodbye handling), so they run whenever the
+    // networking feature is enabled.
+    if (env.NETWORKING_SCHEDULED_ENABLED) {
       messageHandlers.push(createNetworkingMessageListener({ getBotJids }));
       whatsapp.setGroupParticipantsHandler(createNetworkingMembershipListener());
     }
@@ -73,12 +73,6 @@ async function start(): Promise<void> {
       logger.info("Jobs scheduler disabled");
     }
 
-    if (env.NETWORKING_IDLE_ENABLED) {
-      networkingIdleScheduler.start();
-    } else {
-      logger.info("Networking idle scheduler disabled");
-    }
-
     if (env.NETWORKING_SCHEDULED_ENABLED) {
       networkingScheduledScheduler.start();
     } else {
@@ -105,7 +99,6 @@ async function start(): Promise<void> {
 async function shutdown(signal: NodeJS.Signals): Promise<void> {
   logger.info({ signal }, "Shutting down");
   jobsScheduler.stop();
-  networkingIdleScheduler.stop();
   networkingScheduledScheduler.stop();
   eventsScheduler.stop();
   eventRemindersScheduler.stop();

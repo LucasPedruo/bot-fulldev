@@ -185,16 +185,3 @@ export const eventNotifications = pgTable(
   (table) => [unique("event_notifications_event_type_unique").on(table.eventId, table.type)]
 );
 
-export const networkingTopicType = pgEnum("networking_topic_type", ["joke", "poll", "critique", "news"]);
-
-export const networkingTopicHistory = pgTable(
-  "networking_topic_history",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    groupJid: text("group_jid").notNull(),
-    type: networkingTopicType("type").notNull(),
-    content: text("content").notNull(),
-    usedAt: timestamp("used_at", { withTimezone: true }).notNull().defaultNow()
-  },
-  (table) => [index("networking_topic_history_group_used_idx").on(table.groupJid, table.usedAt)]
-);

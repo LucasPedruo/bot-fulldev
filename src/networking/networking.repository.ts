@@ -1,17 +1,11 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "../database/client.js";
-import { groupActivity, groupMembershipLog, mentionReplyLog, networkingSpotlightLog, networkingTopicHistory } from "../database/schema.js";
+import { groupActivity, groupMembershipLog, mentionReplyLog, networkingSpotlightLog } from "../database/schema.js";
 
-export type NetworkingTopicType = "joke" | "poll" | "critique" | "news";
 export type GroupMembershipAction = "add" | "remove";
 export type NetworkingSpotlightSlot = "morning" | "lunch" | "night";
 
 export class NetworkingRepository {
-  async getLastMessageAt(groupJid: string): Promise<Date | undefined> {
-    const [row] = await db.select().from(groupActivity).where(eq(groupActivity.groupJid, groupJid)).limit(1);
-    return row?.lastMessageAt;
-  }
-
   async touchActivity(groupJid: string, at: Date = new Date()): Promise<void> {
     const dateStr = toDateOnly(at);
 
@@ -37,21 +31,6 @@ export class NetworkingRepository {
     }
 
     return row.messagesToday;
-  }
-
-  async recordTopicUsed(input: { groupJid: string; type: NetworkingTopicType; content: string }): Promise<void> {
-    await db.insert(networkingTopicHistory).values(input);
-  }
-
-  async getRecentlyUsedContent(groupJid: string, limit = 10): Promise<string[]> {
-    const rows = await db
-      .select({ content: networkingTopicHistory.content })
-      .from(networkingTopicHistory)
-      .where(eq(networkingTopicHistory.groupJid, groupJid))
-      .orderBy(desc(networkingTopicHistory.usedAt))
-      .limit(limit);
-
-    return rows.map((row) => row.content);
   }
 
   async getMentionMuteUntil(groupJid: string): Promise<Date | undefined> {
