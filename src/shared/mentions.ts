@@ -33,3 +33,10 @@ export async function resolvePhoneJid(jid: string, socket: WASocket): Promise<st
 export async function resolvePhoneJids(jids: string[], socket: WASocket): Promise<string[]> {
   return Promise.all(jids.map((jid) => resolvePhoneJid(jid, socket)));
 }
+
+// A resolved phone-number JID carries a ":<device>" suffix (e.g. "5511999999999:0@s.whatsapp.net").
+// WhatsApp only renders the "@<number>" text as a real tappable mention when it matches the bare
+// number with no device suffix - leaving it in shows up as literal unlinked text "@5511999999999:0".
+export function buildMentionTag(jid: string): string {
+  return `@${jid.split("@")[0].split(":")[0]}`;
+}

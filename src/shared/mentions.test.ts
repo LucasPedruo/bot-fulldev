@@ -1,7 +1,7 @@
 import type { WASocket } from "@whiskeysockets/baileys";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isBotMentioned, resolvePhoneJid, resolvePhoneJids } from "./mentions.js";
+import { buildMentionTag, isBotMentioned, resolvePhoneJid, resolvePhoneJids } from "./mentions.js";
 
 function fakeSocket(getPNForLID: (lid: string) => Promise<string | null>): WASocket {
   return { signalRepository: { lidMapping: { getPNForLID } } } as unknown as WASocket;
@@ -77,4 +77,12 @@ void test("resolvePhoneJids resolves a mixed list of LID and phone-number JIDs",
   const result = await resolvePhoneJids(["162783622594588@lid", "5521988888888@s.whatsapp.net"], socket);
 
   assert.deepEqual(result, ["5511999999999@s.whatsapp.net", "5521988888888@s.whatsapp.net"]);
+});
+
+void test("buildMentionTag strips the device suffix from a resolved phone-number JID", () => {
+  assert.equal(buildMentionTag("5511993099643:0@s.whatsapp.net"), "@5511993099643");
+});
+
+void test("buildMentionTag works on a JID with no device suffix", () => {
+  assert.equal(buildMentionTag("5511993099643@s.whatsapp.net"), "@5511993099643");
 });

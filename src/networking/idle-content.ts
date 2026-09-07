@@ -1,3 +1,5 @@
+import { buildMentionTag } from "../shared/mentions.js";
+
 const languages = ["JavaScript", "TypeScript", "Python", "Java", "PHP", "Ruby", "Go", "Rust", "C#", "Kotlin", "Swift", "C++"];
 const frameworks = ["React", "Angular", "Vue", "Django", "Spring", "Rails", "Laravel", "Express", "Next.js", "Flutter"];
 const temas = [
@@ -117,12 +119,12 @@ const directQuestionTemplates: Array<(tag: string) => string> = [
 ];
 
 export function pickDirectQuestion(participantJid: string): { text: string; mentions: string[] } {
-  const tag = `@${participantJid.split("@")[0]}`;
+  const tag = buildMentionTag(participantJid);
   return { text: pickOne(directQuestionTemplates)(tag), mentions: [participantJid] };
 }
 
 export function buildWelcomeMessage(participantJids: string[]): { text: string; mentions: string[] } {
-  const tags = participantJids.map((jid) => `@${jid.split("@")[0]}`).join(" ");
+  const tags = participantJids.map(buildMentionTag).join(" ");
   return { text: pickOne(welcomeTemplates)(tags), mentions: participantJids };
 }
 

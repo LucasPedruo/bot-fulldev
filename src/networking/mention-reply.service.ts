@@ -2,6 +2,7 @@ import { env } from "../config/env.js";
 import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
+import { buildMentionTag } from "../shared/mentions.js";
 import { pickMentionCooldownMessage, pickMentionReply } from "./idle-content.js";
 import { generateMentionReply } from "./mention-ai.provider.js";
 import { NetworkingRepository } from "./networking.repository.js";
@@ -56,7 +57,7 @@ export class MentionReplyService {
   }
 
   private async reply(groupJid: string, senderJid: string, text: string): Promise<void> {
-    const mentionTag = `@${senderJid.split("@")[0]}`;
+    const mentionTag = buildMentionTag(senderJid);
 
     await this.queue.enqueue({
       type: "networking",

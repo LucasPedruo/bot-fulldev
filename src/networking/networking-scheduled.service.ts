@@ -2,6 +2,7 @@ import { jidNormalizedUser } from "@whiskeysockets/baileys";
 import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
+import { buildMentionTag } from "../shared/mentions.js";
 import { statsService, type StatsService } from "../stats/stats.service.js";
 import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
@@ -68,7 +69,7 @@ export class NetworkingScheduledService {
     const candidates = pool.length > 0 ? pool : eligible;
 
     const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-    const tag = `@${chosen.split("@")[0]}`;
+    const tag = buildMentionTag(chosen);
     const text = pickSpotlightMessage(slot, tag, this.now().getDay());
 
     await this.queue.enqueue({
