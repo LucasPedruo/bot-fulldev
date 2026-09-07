@@ -498,6 +498,16 @@ Pra agendar automaticamente (uma vez que o bot estiver numa VPS), adicionar no c
 
 **Sessao "deslogada" (logged out)**: se o WhatsApp invalidar a sessao (numero desparelhado manualmente, sessao expirada), o bot **nao** tenta reconectar sozinho — nao adianta, precisa de um QR code novo ou parear de novo via `WHATSAPP_PAIRING_PHONE_NUMBER`. Isso agora fica bem visivel no log, em nivel `fatal` (`WhatsAppConnectionManager`, `src/whatsapp/connection.ts`), diferente de uma queda de rede comum (nivel `warn`, reconecta sozinho com backoff exponencial). Restaurar um backup antigo da sessao **nao resolve** esse caso — se o WhatsApp ja invalidou, qualquer sessao (nova ou restaurada) precisa parear de novo; o backup so serve pra reverter uma corrupcao/perda acidental do volume, nao uma sessao deslogada de propósito.
 
+## Deploy
+
+`scripts/deploy.sh` encapsula a sequencia manual que ate agora era feita passo a passo (`git pull`, rebuild, restart): puxa o codigo mais recente da branch atual, **faz backup antes de qualquer coisa** (`scripts/backup.sh`, ja que um deploy ruim que corrompesse dados seria pior sem um backup fresco), reconstroi a imagem, reinicia o container e espera o healthcheck (`/health`, configurado no `docker-compose.yml`) ficar `healthy` antes de considerar sucesso — se nao ficar em 60s ou reportar `unhealthy`, o script termina com erro e manda checar `docker compose logs app`.
+
+```bash
+./scripts/deploy.sh
+```
+
+Deliberadamente **manual** — nao ha webhook nem CI disparando isso sozinho. Testado de ponta a ponta contra os containers reais.
+
 ## Proxima fase
 
-Todos os itens do roadmap original (vagas, ociosidade/mencoes/entrada-saida, networking programado, estatisticas, eventos) estao implementados - memes foi removido por escolha do usuario. Robustez de producao em andamento: backup/recuperacao dos volumes (acima) e alerta melhorado de sessao deslogada ja feitos; falta atualizacao do container, protecao de endpoints administrativos (hoje so existem `/health` e `/ready`, sem autenticacao — relevante quando algum endpoint de controle for adicionado) e, o item mais importante, mover a execucao da maquina local pra uma VPS de verdade (hoje se o Docker Desktop do usuario cair ou o PC desligar, o bot fica offline).
+Todos os itens do roadmap original (vagas, ociosidade/mencoes/entrada-saida, networking programado, estatisticas, eventos) estao implementados - memes foi removido por escolha do usuario. Robustez de producao: backup/recuperacao dos volumes, deploy com healthcheck e alerta melhorado de sessao deslogada ja feitos (secoes acima). Protecao de endpoints administrativos e moot por enquanto (hoje so existem `/health` e `/ready`, sem autenticacao — so vira relevante quando algum endpoint de controle for adicionado). Falta o item mais importante: mover a execucao da maquina local pra uma VPS de verdade (hoje se o Docker Desktop do usuario cair ou o PC desligar, o bot fica offline) — aguardando o usuario provisionar uma VPS (ele pediu pra eu configurar tudo depois que ele criar a conta/servidor, ja que nao sabe fazer isso sozinho).
