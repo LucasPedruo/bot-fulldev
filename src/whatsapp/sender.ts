@@ -1,7 +1,12 @@
 import { whatsapp } from "./client.js";
 
-export async function sendTextMessage(destinationJid: string, text: string, mentions: string[] = []): Promise<void> {
-  await whatsapp.sendText(destinationJid, text, mentions);
+export async function sendTextMessage(
+  destinationJid: string,
+  text: string,
+  mentions: string[] = [],
+  mentionAll = false
+): Promise<void> {
+  await whatsapp.sendText(destinationJid, text, mentions, mentionAll);
 }
 
 export async function sendPollMessage(

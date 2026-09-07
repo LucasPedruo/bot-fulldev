@@ -7,6 +7,8 @@ export type MessageQueueType = (typeof messageQueueTypes)[number];
 export type TextMessagePayload = {
   text: string;
   mentions?: string[];
+  /** WhatsApp's native "mention everyone" - tags the whole group without enumerating JIDs. */
+  mentionAll?: boolean;
 };
 
 export type PollMessagePayload = {

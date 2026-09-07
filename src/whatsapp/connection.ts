@@ -177,10 +177,10 @@ export class WhatsAppConnectionManager {
     return resolvePhoneJids(rawIds, socket);
   }
 
-  async sendText(destinationJid: string, text: string, mentions: string[] = []): Promise<void> {
+  async sendText(destinationJid: string, text: string, mentions: string[] = [], mentionAll = false): Promise<void> {
     const socket = this.requireConnectedSocket();
-    await socket.sendMessage(destinationJid, { text, mentions });
-    this.log.info({ destinationJid, mentionsCount: mentions.length }, "WhatsApp text message sent");
+    await socket.sendMessage(destinationJid, { text, mentions, mentionAll });
+    this.log.info({ destinationJid, mentionsCount: mentions.length, mentionAll }, "WhatsApp text message sent");
   }
 
   async sendPoll(destinationJid: string, name: string, values: string[], selectableCount = 1): Promise<void> {

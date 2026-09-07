@@ -208,24 +208,11 @@ void test("sendReminders never resends a reminder type already recorded for an e
   assert.equal(queue.enqueued.length, 0);
 });
 
-const botJid = "5500000000000@s.whatsapp.net";
-const participantJids = ["5511999999999@s.whatsapp.net", "5521988888888@s.whatsapp.net"];
-
-void test("sendPromotions creates a native event, a poll and a mention-all message for events 5 days out", async () => {
+void test("sendPromotions creates a native event, a poll and a native mention-all message for events 5 days out", async () => {
   const persisted: PersistedEvent = { ...event, id: "event-1" };
   const repository = new FakeRepository(undefined, 0, [persisted]);
   const queue = new FakeQueue();
-  const service = new EventService(
-    [],
-    repository,
-    queue,
-    () => new Date(2026, 8, 2),
-    async () => {
-      await Promise.resolve();
-      return [...participantJids, botJid];
-    },
-    () => [botJid]
-  );
+  const service = new EventService([], repository, queue, () => new Date(2026, 8, 2));
 
   const result = await service.sendPromotions();
 
@@ -237,52 +224,19 @@ void test("sendPromotions creates a native event, a poll and a mention-all messa
   assert.equal(eventMessage.type, "event_promo");
   assert.ok("eventCreation" in eventMessage.payload && eventMessage.payload.eventCreation.name === event.title);
   assert.ok("poll" in pollMessage.payload && pollMessage.payload.poll.name.includes(event.title));
-  assert.ok("text" in mentionMessage.payload && mentionMessage.payload.mentions?.length === 2);
-  assert.ok("text" in mentionMessage.payload && !mentionMessage.payload.mentions?.includes(botJid));
+  assert.ok("text" in mentionMessage.payload && mentionMessage.payload.mentionAll === true);
 });
 
 void test("sendPromotions never resends the promo for an event already promoted", async () => {
   const persisted: PersistedEvent = { ...event, id: "event-1" };
   const repository = new FakeRepository(undefined, 0, [persisted], true);
   const queue = new FakeQueue();
-  const service = new EventService(
-    [],
-    repository,
-    queue,
-    () => new Date(2026, 8, 2),
-    async () => {
-      await Promise.resolve();
-      return participantJids;
-    },
-    () => []
-  );
+  const service = new EventService([], repository, queue, () => new Date(2026, 8, 2));
 
   const result = await service.sendPromotions();
 
   assert.equal(result.sent, 0);
   assert.equal(queue.enqueued.length, 0);
-});
-
-void test("sendPromotions skips the mention-all message when listing participants fails", async () => {
-  const persisted: PersistedEvent = { ...event, id: "event-1" };
-  const repository = new FakeRepository(undefined, 0, [persisted]);
-  const queue = new FakeQueue();
-  const service = new EventService(
-    [],
-    repository,
-    queue,
-    () => new Date(2026, 8, 2),
-    async () => {
-      await Promise.resolve();
-      throw new Error("not connected");
-    },
-    () => []
-  );
-
-  const result = await service.sendPromotions();
-
-  assert.equal(result.sent, 1);
-  assert.equal(queue.enqueued.length, 2);
 });
 
 void test("cleanupExpiredEvents deletes events dated before today", async () => {

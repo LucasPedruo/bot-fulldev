@@ -11,7 +11,7 @@ export type QueueRepositoryLike = Pick<
   "claimNext" | "markFailed" | "markSent" | "recoverStaleProcessing" | "reschedulePending"
 >;
 
-export type QueueTextSender = (destinationGroup: string, text: string, mentions: string[]) => Promise<void>;
+export type QueueTextSender = (destinationGroup: string, text: string, mentions: string[], mentionAll: boolean) => Promise<void>;
 export type QueuePollSender = (
   destinationGroup: string,
   name: string,
@@ -144,7 +144,12 @@ export class QueueWorker {
         const { name, description, startDateIso, endDateIso } = message.payload.eventCreation;
         await this.eventSender(message.destinationGroup, name, description, startDateIso, endDateIso);
       } else {
-        await this.sender(message.destinationGroup, message.payload.text, message.payload.mentions ?? []);
+        await this.sender(
+          message.destinationGroup,
+          message.payload.text,
+          message.payload.mentions ?? [],
+          message.payload.mentionAll ?? false
+        );
       }
 
       await this.repository.markSent(message.id);

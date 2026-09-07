@@ -6,7 +6,8 @@ import type { EnqueueMessageInput, MessagePayload, MessageQueueType, QueueMessag
 
 const textMessagePayloadSchema = z.object({
   text: z.string().min(1),
-  mentions: z.array(z.string()).optional()
+  mentions: z.array(z.string()).optional(),
+  mentionAll: z.boolean().optional()
 });
 
 const pollMessagePayloadSchema = z.object({

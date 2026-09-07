@@ -1,9 +1,7 @@
-import { jidNormalizedUser } from "@whiskeysockets/baileys";
 import { env } from "../config/env.js";
 import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
-import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
 import { formatEventPromoDescription, formatEventReminderMessage, formatNewEventMessage } from "./event.formatter.js";
 import { isInCurrentMonth } from "./event.normalizer.js";
@@ -45,12 +43,7 @@ export class EventService {
     private readonly providers: EventProvider[] = createDefaultProviders(),
     private readonly repository: EventRepositoryLike = new EventRepository(),
     private readonly queue: QueueServiceLike = queueService,
-    private readonly now: () => Date = () => new Date(),
-    private readonly listParticipants: (groupJid: string) => Promise<string[]> = (groupJid) => whatsapp.listParticipants(groupJid),
-    private readonly getBotJids: () => string[] = () => {
-      const user = whatsapp.getSocket()?.user;
-      return [user?.id, user?.lid].filter((jid): jid is string => Boolean(jid));
-    }
+    private readonly now: () => Date = () => new Date()
   ) {}
 
   async poll(): Promise<EventsPollResult> {
@@ -185,37 +178,17 @@ export class EventService {
         payload: { poll: { name: `Vai participar de ${event.title}?`, values: ["Sim", "Não", "Talvez"] } }
       });
 
-      const mentionText = await this.buildMentionAllText(destinationGroup, event.title);
-      if (mentionText) {
-        await this.queue.enqueue({ type: "event_promo", destinationGroup, payload: mentionText });
-      }
+      await this.queue.enqueue({
+        type: "event_promo",
+        destinationGroup,
+        payload: { text: `Quem vai em "${event.title}"? Responde na enquete acima! @todos`, mentionAll: true }
+      });
 
       sent += 1;
     }
 
     logger.info({ sent }, "Event promotions sent");
     return { sent };
-  }
-
-  private async buildMentionAllText(groupJid: string, eventTitle: string): Promise<{ text: string; mentions: string[] } | undefined> {
-    let participants: string[];
-
-    try {
-      participants = await this.listParticipants(groupJid);
-    } catch (error) {
-      logger.error({ groupJid, err: error }, "Failed to list participants for event promotion");
-      return undefined;
-    }
-
-    const normalizedBotJids = new Set(this.getBotJids().map(jidNormalizedUser));
-    const eligible = participants.filter((jid) => !normalizedBotJids.has(jidNormalizedUser(jid)));
-
-    if (eligible.length === 0) {
-      return undefined;
-    }
-
-    const tags = eligible.map((jid) => `@${jid.split("@")[0]}`).join(" ");
-    return { text: `Quem vai em "${eventTitle}"? Responde na enquete acima! ${tags}`, mentions: eligible };
   }
 
   // TBA events (no startDate) are never touched here - there's no date to judge them expired by.
