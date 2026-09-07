@@ -7,8 +7,10 @@ coverage/
 
 data/
 sessions/
+backups/
 *.dump
 *.sql.gz
+*.tar.gz
 *.log
 
 .DS_Store

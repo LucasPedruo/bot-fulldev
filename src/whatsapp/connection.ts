@@ -117,9 +117,17 @@ export class WhatsAppConnectionManager {
         const statusCode = getDisconnectStatusCode(lastDisconnect?.error);
         const loggedOut = statusCode === DisconnectReason.loggedOut;
         this.status = loggedOut ? "logged_out" : "disconnected";
-        this.log.warn({ statusCode, loggedOut }, "WhatsApp disconnected");
 
-        if (!loggedOut) {
+        if (loggedOut) {
+          // Unrecoverable without a human: the session was invalidated (unlinked from the phone,
+          // expired, etc). Nothing will reconnect it automatically - logged at "fatal" so it stands
+          // out from the routine warn-level disconnects that self-heal via scheduleReconnect below.
+          this.log.fatal(
+            { statusCode },
+            "WhatsApp session logged out - re-pairing required (scan a new QR code or set WHATSAPP_PAIRING_PHONE_NUMBER and restart)"
+          );
+        } else {
+          this.log.warn({ statusCode }, "WhatsApp disconnected, reconnecting");
           this.scheduleReconnect();
         }
       }

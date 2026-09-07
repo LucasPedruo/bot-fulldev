@@ -464,10 +464,40 @@ src/
     cli/
   shared/
 drizzle/
+scripts/
 Dockerfile
 docker-compose.yml
 ```
 
+## Backup e recuperacao
+
+O bot guarda dois tipos de estado que **nao existem em nenhum outro lugar** se forem perdidos: a sessao pareada do WhatsApp (volume `whatsapp_auth`) e o banco Postgres (volume `postgres_data`). Nenhum dos dois tinha backup ate agora.
+
+`scripts/backup.sh` gera dois arquivos em `./backups/` (fora de qualquer volume Docker, para nao serem perdidos junto se um volume corromper ou for removido por engano):
+
+```bash
+./scripts/backup.sh
+```
+
+Le os dados atraves dos proprios containers `app`/`postgres` (`docker compose exec`), entao funciona independente do nome real do volume Docker (que muda conforme o nome da pasta do projeto). Remove sozinho backups com mais de 14 dias.
+
+**`backups/` esta no `.gitignore`** — o backup do WhatsApp contem as credenciais reais da sessao pareada (equivalente a controle total da conta), nunca deve ir pro git nem ser compartilhado.
+
+Pra agendar automaticamente (uma vez que o bot estiver numa VPS), adicionar no crontab do servidor:
+
+```cron
+0 3 * * * cd /caminho/do/projeto && ./scripts/backup.sh >> backups/backup.log 2>&1
+```
+
+**Restaurar** (ambos os scripts pedem confirmacao explicita antes de sobrescrever, por serem destrutivos):
+
+```bash
+./scripts/restore-postgres.sh backups/postgres_20260906_030000.sql.gz
+./scripts/restore-whatsapp.sh backups/whatsapp_auth_20260906_030000.tar.gz
+```
+
+**Sessao "deslogada" (logged out)**: se o WhatsApp invalidar a sessao (numero desparelhado manualmente, sessao expirada), o bot **nao** tenta reconectar sozinho — nao adianta, precisa de um QR code novo ou parear de novo via `WHATSAPP_PAIRING_PHONE_NUMBER`. Isso agora fica bem visivel no log, em nivel `fatal` (`WhatsAppConnectionManager`, `src/whatsapp/connection.ts`), diferente de uma queda de rede comum (nivel `warn`, reconecta sozinho com backoff exponencial). Restaurar um backup antigo da sessao **nao resolve** esse caso — se o WhatsApp ja invalidou, qualquer sessao (nova ou restaurada) precisa parear de novo; o backup so serve pra reverter uma corrupcao/perda acidental do volume, nao uma sessao deslogada de propósito.
+
 ## Proxima fase
 
-Todos os itens do roadmap original (vagas, ociosidade/mencoes/entrada-saida, networking programado, estatisticas, eventos) estao implementados - memes foi removido por escolha do usuario. O que falta e producao: backup do volume `whatsapp_auth`, plano de recuperacao apos falha, atualizacao do container, monitoramento/logs centralizados, protecao de endpoints administrativos (hoje so existem `/health` e `/ready`, sem autenticacao — relevante quando algum endpoint de controle for adicionado) e configuracao de VPS.
+Todos os itens do roadmap original (vagas, ociosidade/mencoes/entrada-saida, networking programado, estatisticas, eventos) estao implementados - memes foi removido por escolha do usuario. Robustez de producao em andamento: backup/recuperacao dos volumes (acima) e alerta melhorado de sessao deslogada ja feitos; falta atualizacao do container, protecao de endpoints administrativos (hoje so existem `/health` e `/ready`, sem autenticacao — relevante quando algum endpoint de controle for adicionado) e, o item mais importante, mover a execucao da maquina local pra uma VPS de verdade (hoje se o Docker Desktop do usuario cair ou o PC desligar, o bot fica offline).
