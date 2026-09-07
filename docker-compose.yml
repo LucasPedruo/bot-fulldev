@@ -12,7 +12,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgres://fulldev:fulldev@postgres:5432/fulldev_bot}
       TZ: ${TZ:-America/Sao_Paulo}
     ports:
-      - "${PORT:-3000}:3000"
+      - "127.0.0.1:${PORT:-3000}:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,7 +34,7 @@ services:
       POSTGRES_DB: fulldev_bot
       TZ: ${TZ:-America/Sao_Paulo}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
