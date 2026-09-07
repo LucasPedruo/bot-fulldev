@@ -106,6 +106,32 @@ void test("JobService queues a new job for both jobs groups", async () => {
   assert.equal(repository.deliveries.length, 2);
 });
 
+void test("JobService also sends internship/junior jobs to the faculty group", async () => {
+  const juniorJob: NormalizedJob = { ...job, level: "junior" };
+  const repository = new FakeRepository();
+  const queue = new FakeQueue();
+  const service = new JobService([new FakeProvider([juniorJob])], repository, queue);
+
+  const result = await service.poll();
+
+  assert.equal(result.queued, 3);
+  assert.deepEqual(
+    queue.enqueued.map((message) => message.destinationGroup),
+    ["120363391901542507@g.us", "120363417654610744@g.us", "120363401995520356@g.us"]
+  );
+});
+
+void test("JobService never sends mid/senior/unclassified jobs to the faculty group - its audience is entry-level", async () => {
+  const repository = new FakeRepository();
+  const queue = new FakeQueue();
+  const service = new JobService([new FakeProvider([{ ...job, level: "mid" }, { ...job, level: undefined, externalId: "job-2" }])], repository, queue);
+
+  const result = await service.poll();
+
+  assert.equal(result.queued, 4);
+  assert.ok(!queue.enqueued.some((message) => message.destinationGroup === "120363401995520356@g.us"));
+});
+
 void test("JobService skips duplicate jobs", async () => {
   const repository = new FakeRepository({
     ...job,

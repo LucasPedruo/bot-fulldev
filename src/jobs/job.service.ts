@@ -90,11 +90,14 @@ export class JobService {
   private async enqueueJobToJobsGroups(job: PersistedJob): Promise<number> {
     const groups = getConfiguredWhatsAppGroups();
     // Every configured jobs group gets the exact same posting - the faculty group's copy just has
-    // an extra line inviting people to check out the FullDev community.
+    // an extra line inviting people to check out the FullDev community. The faculty group only gets
+    // internship/junior postings (its members are just starting their careers); a job with no known
+    // level is skipped there too, since it can't be confirmed as entry-level.
+    const isFacultyEligible = job.level === "intern" || job.level === "junior";
     const destinations = [
       { group: groups.jobsGroup1, text: formatJobMessage(job) },
       { group: groups.jobsGroup2, text: formatJobMessage(job) },
-      { group: groups.facultyJobsGroup, text: formatJobMessageForFaculty(job) }
+      ...(isFacultyEligible ? [{ group: groups.facultyJobsGroup, text: formatJobMessageForFaculty(job) }] : [])
     ].filter((destination) => destination.group.length > 0);
     let queued = 0;
 

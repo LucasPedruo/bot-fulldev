@@ -121,7 +121,7 @@ WHATSAPP_NETWORKING_GROUP_2=
 
 `WHATSAPP_NETWORKING_GROUP` ainda existe como alias legado para o primeiro grupo de networking.
 
-`WHATSAPP_FACULTY_JOBS_GROUP` e o grupo de vagas de uma faculdade parceira — recebe exatamente as mesmas vagas que `JOBS_GROUP_1`/`JOBS_GROUP_2` (`JobService.enqueueJobToJobsGroups`, `src/jobs/job.service.ts`, envia a mesma vaga pros tres grupos configurados, pulando qualquer um vazio), so que cada mensagem la ganha uma linha extra convidando pra conhecer a comunidade FullDev (`formatJobMessageForFaculty`, `src/jobs/job.formatter.ts`). O grupo tambem responde `@bot vagas de junior frontend` do mesmo jeito que os outros dois grupos de vagas.
+`WHATSAPP_FACULTY_JOBS_GROUP` e o grupo de vagas de uma faculdade parceira — recebe as mesmas vagas que `JOBS_GROUP_1`/`JOBS_GROUP_2` (`JobService.enqueueJobToJobsGroups`, `src/jobs/job.service.ts`), com uma linha extra convidando pra conhecer a comunidade FullDev (`formatJobMessageForFaculty`, `src/jobs/job.formatter.ts`), mas **filtradas para estagio/junior apenas** (`job.level === "intern" || "junior"`) — publico em inicio de carreira, entao vagas de pleno/senior ou sem nivel classificado nunca vao pra esse grupo. O grupo tambem responde `@bot vagas de junior frontend` do mesmo jeito que os outros dois grupos de vagas.
 
 ## WhatsApp
 
