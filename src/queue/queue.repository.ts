@@ -17,14 +17,16 @@ const pollMessagePayloadSchema = z.object({
   })
 });
 
-const imageMessagePayloadSchema = z.object({
-  image: z.object({
-    filename: z.string().min(1),
-    caption: z.string().optional()
+const eventCreationMessagePayloadSchema = z.object({
+  eventCreation: z.object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    startDateIso: z.string().min(1),
+    endDateIso: z.string().optional()
   })
 });
 
-const messagePayloadSchema = z.union([textMessagePayloadSchema, pollMessagePayloadSchema, imageMessagePayloadSchema]);
+const messagePayloadSchema = z.union([textMessagePayloadSchema, pollMessagePayloadSchema, eventCreationMessagePayloadSchema]);
 
 type MessageQueueRow = typeof messageQueue.$inferSelect;
 

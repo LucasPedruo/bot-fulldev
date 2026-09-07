@@ -358,30 +358,6 @@ Os numeros sao calculados a partir de mensagens **realmente enviadas/falhadas na
 
 O resumo diario (`buildDailySummary`, `src/networking/scheduled-content.ts`) mostra vagas descobertas/enviadas, eventos descobertos/enviados, lembretes de evento enviados e mensagens trocadas no grupo. `StatsService` ainda calcula mensagens de networking enviadas e mensagens com falha (podem ser uteis pra debug/futuro), e `group_membership_log` ainda registra entradas/saidas — mas nenhum desses 4 numeros aparece mais no resumo (removidos a pedido do usuario, por ficarem sempre zerados/pouco uteis no dia a dia).
 
-## Memes
-
-Estrutura para o bot enviar imagens de meme nos grupos de Networking, misturadas no conteudo de ociosidade (`NetworkingIdleService`) com chance configuravel (`MEMES_CHANCE`, padrao 10%).
-
-`assets/memes/` comeca **vazia** — nao existem memes de verdade ainda. Para adicionar:
-
-```text
-assets/memes/
-  backend/
-    deploy-sexta.jpg
-  frontend/
-    centralizar-div.png
-```
-
-Depois rode `npm run memes:sync` para registrar os arquivos novos no banco (categoria = nome da subpasta; legenda em branco, edite depois se quiser). O meme escolhido e sempre o que esta ha mais tempo sem ser usado (tabela `memes`, colunas `category`/`filename`/`caption`/`lastUsedAt`).
-
-```env
-MEMES_DIR=assets/memes
-MEMES_SEND_ENABLED=false
-MEMES_CHANCE=0.1
-```
-
-`MEMES_SEND_ENABLED=false` por padrao — mesmo com memes cadastrados, nada e enviado ate essa flag virar `true`.
-
 ## Eventos
 
 Descobre e divulga eventos de tecnologia no grupo `WHATSAPP_EVENTS_GROUP`, com lembretes automaticos.
@@ -480,8 +456,6 @@ src/
   jobs/
     providers/
     cli/
-  memes/
-    cli/
   networking/
   queue/
   scheduler/
@@ -489,8 +463,6 @@ src/
   whatsapp/
     cli/
   shared/
-assets/
-  memes/
 drizzle/
 Dockerfile
 docker-compose.yml
@@ -498,4 +470,4 @@ docker-compose.yml
 
 ## Proxima fase
 
-Todos os itens do roadmap original (vagas, ociosidade/mencoes/entrada-saida, networking programado, estatisticas, memes, eventos) estao implementados. O que falta e producao: backup do volume `whatsapp_auth`, plano de recuperacao apos falha, atualizacao do container, monitoramento/logs centralizados, protecao de endpoints administrativos (hoje so existem `/health` e `/ready`, sem autenticacao — relevante quando algum endpoint de controle for adicionado) e configuracao de VPS.
+Todos os itens do roadmap original (vagas, ociosidade/mencoes/entrada-saida, networking programado, estatisticas, eventos) estao implementados - memes foi removido por escolha do usuario. O que falta e producao: backup do volume `whatsapp_auth`, plano de recuperacao apos falha, atualizacao do container, monitoramento/logs centralizados, protecao de endpoints administrativos (hoje so existem `/health` e `/ready`, sem autenticacao — relevante quando algum endpoint de controle for adicionado) e configuracao de VPS.

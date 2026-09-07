@@ -1,6 +1,5 @@
 import { jidNormalizedUser } from "@whiskeysockets/baileys";
 import { env } from "../config/env.js";
-import { memeService, type MemeContent, type MemeService } from "../memes/meme.service.js";
 import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
@@ -30,7 +29,6 @@ export class NetworkingIdleService {
     private readonly groups: string[] = getConfiguredWhatsAppGroups().networkingGroups,
     private readonly random: () => number = () => Math.random(),
     private readonly newsProvider: () => Promise<DevToArticle | undefined> = fetchTopDevToArticle,
-    private readonly memeProvider: Pick<MemeService, "pickMemeContent"> = memeService,
     private readonly listParticipants: (groupJid: string) => Promise<string[]> = (groupJid) => whatsapp.listParticipants(groupJid),
     private readonly getBotJids: () => string[] = () => {
       const user = whatsapp.getSocket()?.user;
@@ -69,13 +67,6 @@ export class NetworkingIdleService {
     // Reset the clock before enqueueing, not after sending, so a message still sitting in the
     // queue (retry, quiet hours) doesn't let the next scheduler tick fire a second one.
     await this.repository.touchActivity(groupJid, this.now());
-
-    const memeContent = this.random() < env.MEMES_CHANCE ? await this.memeProvider.pickMemeContent() : undefined;
-
-    if (memeContent) {
-      await this.enqueueImage(groupJid, memeContent);
-      return;
-    }
 
     if (this.random() < DIRECT_QUESTION_CHANCE) {
       const participant = await this.pickRandomParticipant(groupJid);
@@ -138,14 +129,6 @@ export class NetworkingIdleService {
     logger.info({ groupJid, type: "poll" }, "Networking idle topic queued");
   }
 
-  private async enqueueImage(groupJid: string, content: MemeContent): Promise<void> {
-    await this.queue.enqueue({
-      type: "networking",
-      destinationGroup: groupJid,
-      payload: { image: { filename: content.filename, caption: content.caption } }
-    });
-    logger.info({ groupJid, filename: content.filename }, "Networking meme queued");
-  }
 }
 
 export const networkingIdleService = new NetworkingIdleService();

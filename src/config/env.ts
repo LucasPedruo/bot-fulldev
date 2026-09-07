@@ -97,10 +97,7 @@ const envSchema = z.object({
   MENTION_REPLY_AI_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
   GROQ_API_KEY: z.string().optional().default(""),
   GROQ_MODEL: z.string().min(1).default("openai/gpt-oss-20b"),
-  NETWORKING_SCHEDULED_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
-  MEMES_DIR: z.string().min(1).default("assets/memes"),
-  MEMES_SEND_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
-  MEMES_CHANCE: z.coerce.number().min(0).max(1).default(0.1)
+  NETWORKING_SCHEDULED_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false)
 });
 
 export type Env = z.infer<typeof envSchema>;

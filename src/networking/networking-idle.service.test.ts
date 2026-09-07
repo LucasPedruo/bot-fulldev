@@ -168,34 +168,6 @@ void test("falls back to a template topic when the news provider fails", async (
   assert.notEqual(repository.recorded[0].type, "news");
 });
 
-void test("posts a meme when the meme roll hits and the provider returns content", async () => {
-  const repository = new FakeRepository(new Date(dayTime.getTime() - 121 * 60_000));
-  const queue = new FakeQueue();
-  const service = new NetworkingIdleService(
-    repository,
-    queue,
-    () => dayTime,
-    [group],
-    () => 0.0,
-    async () => {
-      await Promise.resolve();
-      throw new Error("newsProvider should not be called");
-    },
-    {
-      pickMemeContent: async () => {
-        await Promise.resolve();
-        return { filename: "bug-in-prod.jpg", caption: "Sexta-feira" };
-      }
-    }
-  );
-
-  const result = await service.checkAndPost();
-
-  assert.deepEqual(result, { posted: 1 });
-  assert.equal(queue.enqueued.length, 1);
-  assert.deepEqual(queue.enqueued[0].payload, { image: { filename: "bug-in-prod.jpg", caption: "Sexta-feira" } });
-});
-
 void test("posts a direct question mentioning a real participant when that roll hits", async () => {
   const repository = new FakeRepository(new Date(dayTime.getTime() - 121 * 60_000));
   const queue = new FakeQueue();
@@ -210,12 +182,6 @@ void test("posts a direct question mentioning a real participant when that roll 
     async () => {
       await Promise.resolve();
       throw new Error("newsProvider should not be called");
-    },
-    {
-      pickMemeContent: async () => {
-        await Promise.resolve();
-        return undefined;
-      }
     },
     async () => {
       await Promise.resolve();
@@ -236,9 +202,9 @@ void test("posts a direct question mentioning a real participant when that roll 
 void test("falls back to normal idle content when listing participants fails for the direct question", async () => {
   const repository = new FakeRepository(new Date(dayTime.getTime() - 121 * 60_000));
   const queue = new FakeQueue();
-  // Sequence covers the meme roll (skip), the direct-question roll (hit, but listing fails below),
-  // and the news roll (skip) - falling all the way through to the plain template content.
-  const rolls = [0.99, 0.0, 0.99];
+  // Sequence covers the direct-question roll (hit, but listing fails below) and the news roll
+  // (skip) - falling all the way through to the plain template content.
+  const rolls = [0.0, 0.99];
   let rollIndex = 0;
   const service = new NetworkingIdleService(
     repository,
@@ -249,12 +215,6 @@ void test("falls back to normal idle content when listing participants fails for
     async () => {
       await Promise.resolve();
       throw new Error("newsProvider should not be called");
-    },
-    {
-      pickMemeContent: async () => {
-        await Promise.resolve();
-        return undefined;
-      }
     },
     async () => {
       await Promise.resolve();
@@ -269,31 +229,4 @@ void test("falls back to normal idle content when listing participants fails for
   assert.equal(queue.enqueued.length, 1);
   const payload = queue.enqueued[0].payload as { text?: string; mentions?: string[] };
   assert.equal(payload.mentions, undefined);
-});
-
-void test("falls back past the meme check when the meme provider returns nothing", async () => {
-  const repository = new FakeRepository(new Date(dayTime.getTime() - 121 * 60_000));
-  const queue = new FakeQueue();
-  const service = new NetworkingIdleService(
-    repository,
-    queue,
-    () => dayTime,
-    [group],
-    () => 0.0,
-    async () => {
-      await Promise.resolve();
-      return { title: "Why TypeScript Rocks", url: "https://dev.to/example" };
-    },
-    {
-      pickMemeContent: async () => {
-        await Promise.resolve();
-        return undefined;
-      }
-    }
-  );
-
-  await service.checkAndPost();
-
-  const payload = queue.enqueued[0].payload as { text: string };
-  assert.match(payload.text, /Why TypeScript Rocks/);
 });

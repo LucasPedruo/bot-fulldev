@@ -17,15 +17,6 @@ export type PollMessagePayload = {
   };
 };
 
-export type ImageMessagePayload = {
-  image: {
-    // Filename under MEMES_DIR, not raw bytes - the sender reads the file from disk when
-    // actually delivering the message, so the queue payload stays small.
-    filename: string;
-    caption?: string;
-  };
-};
-
 export type EventCreationMessagePayload = {
   eventCreation: {
     name: string;
@@ -37,7 +28,7 @@ export type EventCreationMessagePayload = {
   };
 };
 
-export type MessagePayload = TextMessagePayload | PollMessagePayload | ImageMessagePayload | EventCreationMessagePayload;
+export type MessagePayload = TextMessagePayload | PollMessagePayload | EventCreationMessagePayload;
 
 export type QueueMessage = {
   id: string;

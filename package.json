@@ -14,7 +14,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "jobs:poll": "tsx src/jobs/cli/poll.ts",
-    "memes:sync": "tsx src/memes/cli/sync.ts",
     "events:poll": "tsx src/events/cli/poll.ts",
     "queue:enqueue-test": "tsx src/queue/cli/enqueue-test.ts",
     "whatsapp:list-groups": "tsx src/whatsapp/cli/list-groups.ts",

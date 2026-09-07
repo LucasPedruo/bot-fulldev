@@ -176,12 +176,6 @@ export class WhatsAppConnectionManager {
     this.log.info({ destinationJid, optionsCount: values.length }, "WhatsApp poll sent");
   }
 
-  async sendImage(destinationJid: string, image: Buffer, caption?: string): Promise<void> {
-    const socket = this.requireConnectedSocket();
-    await socket.sendMessage(destinationJid, { image, caption });
-    this.log.info({ destinationJid, hasCaption: Boolean(caption) }, "WhatsApp image sent");
-  }
-
   async sendEvent(destinationJid: string, name: string, description: string | undefined, startDate: Date, endDate?: Date): Promise<void> {
     const socket = this.requireConnectedSocket();
     await socket.sendMessage(destinationJid, { event: { name, description, startDate, endDate } });
