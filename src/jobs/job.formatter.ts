@@ -44,6 +44,14 @@ export function formatJobMessage(job: NormalizedJob): string {
   return lines.join("\n");
 }
 
+// Same job facts as formatJobMessage - every group gets the identical posting - plus an extra
+// line inviting the college group specifically to check out the FullDev community.
+const FACULTY_COMMUNITY_INVITE = "🚀 Quer trocar ideia com outros devs, indicações de vaga e conteúdo todo dia? Conheça a comunidade FullDev: https://fulldev.com.br";
+
+export function formatJobMessageForFaculty(job: NormalizedJob): string {
+  return `${formatJobMessage(job)}\n\n${FACULTY_COMMUNITY_INVITE}`;
+}
+
 export function formatJobQueryReply(jobs: NormalizedJob[], query: JobQuery): string {
   if (jobs.length === 0) {
     return describeNoMatchMessage(query);

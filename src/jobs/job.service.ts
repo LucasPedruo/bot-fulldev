@@ -3,7 +3,7 @@ import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
 import { env } from "../config/env.js";
-import { formatJobMessage } from "./job.formatter.js";
+import { formatJobMessage, formatJobMessageForFaculty } from "./job.formatter.js";
 import { JobRepository } from "./job.repository.js";
 import type { NormalizedJob, PersistedJob } from "./job.types.js";
 import { ArbeitnowProvider } from "./providers/arbeitnow.provider.js";
@@ -89,16 +89,21 @@ export class JobService {
 
   private async enqueueJobToJobsGroups(job: PersistedJob): Promise<number> {
     const groups = getConfiguredWhatsAppGroups();
-    const destinations = [groups.jobsGroup1, groups.jobsGroup2].filter((jid) => jid.length > 0);
-    const message = formatJobMessage(job);
+    // Every configured jobs group gets the exact same posting - the faculty group's copy just has
+    // an extra line inviting people to check out the FullDev community.
+    const destinations = [
+      { group: groups.jobsGroup1, text: formatJobMessage(job) },
+      { group: groups.jobsGroup2, text: formatJobMessage(job) },
+      { group: groups.facultyJobsGroup, text: formatJobMessageForFaculty(job) }
+    ].filter((destination) => destination.group.length > 0);
     let queued = 0;
 
-    for (const destinationGroup of destinations) {
+    for (const { group: destinationGroup, text } of destinations) {
       const queuedMessage = await this.queue.enqueue({
         type: "job",
         destinationGroup,
         payload: {
-          text: message
+          text
         }
       });
 

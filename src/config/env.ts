@@ -39,6 +39,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url().default("postgres://fulldev:fulldev@localhost:5432/fulldev_bot"),
   WHATSAPP_JOBS_GROUP_1: z.string().optional().default(""),
   WHATSAPP_JOBS_GROUP_2: z.string().optional().default(""),
+  WHATSAPP_FACULTY_JOBS_GROUP: z.string().optional().default(""),
   WHATSAPP_EVENTS_GROUP: z.string().optional().default(""),
   WHATSAPP_NETWORKING_GROUP: z.string().optional().default(""),
   WHATSAPP_NETWORKING_GROUP_1: z.string().optional().default(""),

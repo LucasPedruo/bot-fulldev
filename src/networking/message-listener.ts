@@ -1,5 +1,6 @@
 import type { WAMessage } from "@whiskeysockets/baileys";
-import { isBotMentioned } from "../shared/mentions.js";
+import { isBotMentioned, resolvePhoneJid } from "../shared/mentions.js";
+import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
 import { mentionReplyService, type MentionReplyService } from "./mention-reply.service.js";
 import { NetworkingRepository } from "./networking.repository.js";
@@ -15,6 +16,9 @@ export type NetworkingMessageListenerOptions = {
   networkingGroups?: string[];
   repository?: NetworkingRepositoryLike;
   mentionService?: MentionReplyServiceLike;
+  // Resolves the sender's JID to its phone-number form before it's used to build an outgoing
+  // @mention tag - a LID-based tag renders as plain unlinked text in WhatsApp clients.
+  resolveSenderJid?: (jid: string) => Promise<string>;
 };
 
 export function createNetworkingMessageListener(
@@ -22,6 +26,12 @@ export function createNetworkingMessageListener(
 ): (message: WAMessage) => Promise<void> {
   const repository = options.repository ?? new NetworkingRepository();
   const mentionService = options.mentionService ?? mentionReplyService;
+  const resolveSenderJid =
+    options.resolveSenderJid ??
+    (async (jid: string) => {
+      const socket = whatsapp.getSocket();
+      return socket ? resolvePhoneJid(jid, socket) : jid;
+    });
 
   return async function handleIncomingMessage(message: WAMessage): Promise<void> {
     const remoteJid = message.key?.remoteJid;
@@ -45,11 +55,12 @@ export function createNetworkingMessageListener(
       return;
     }
 
-    const senderJid = message.key?.participant ?? message.key?.remoteJid;
-    if (!senderJid) {
+    const rawSenderJid = message.key?.participant ?? message.key?.remoteJid;
+    if (!rawSenderJid) {
       return;
     }
 
+    const senderJid = await resolveSenderJid(rawSenderJid);
     const messageText = message.message?.conversation ?? message.message?.extendedTextMessage?.text ?? undefined;
     await mentionService.handleMention(remoteJid, senderJid, messageText);
   };

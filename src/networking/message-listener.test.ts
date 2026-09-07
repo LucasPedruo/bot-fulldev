@@ -113,6 +113,33 @@ void test("recognizes a mention that uses the bot's LID instead of its phone-num
   ]);
 });
 
+void test("resolves the sender's LID to a phone-number JID before delegating", async () => {
+  const repository = new FakeRepository();
+  const mentionService = new FakeMentionService();
+  const listener = createNetworkingMessageListener({
+    getBotJids,
+    networkingGroups,
+    repository,
+    mentionService,
+    resolveSenderJid: async (jid) => {
+      await Promise.resolve();
+      return jid === "162783622594588@lid" ? "5511999999999@s.whatsapp.net" : jid;
+    }
+  });
+
+  await listener(
+    buildMessage({
+      remoteJid: networkingGroups[0],
+      participant: "162783622594588@lid",
+      mentionedJid: ["999888777@lid"]
+    })
+  );
+
+  assert.deepEqual(mentionService.handled, [
+    { groupJid: networkingGroups[0], senderJid: "5511999999999@s.whatsapp.net", messageText: "oi @bot" }
+  ]);
+});
+
 void test("passes the actual mention message text through to the mention service", async () => {
   const repository = new FakeRepository();
   const mentionService = new FakeMentionService();

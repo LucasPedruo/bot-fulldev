@@ -2,6 +2,8 @@ import type { BaileysEventMap } from "@whiskeysockets/baileys";
 import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
+import { resolvePhoneJids } from "../shared/mentions.js";
+import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
 import { buildWelcomeMessage, pickGoodbyeMessage } from "./idle-content.js";
 import { NetworkingRepository } from "./networking.repository.js";
@@ -16,6 +18,9 @@ export type MembershipListenerOptions = {
   networkingGroups?: string[];
   queue?: QueueServiceLike;
   repository?: NetworkingRepositoryLike;
+  // Resolves participant JIDs to their phone-number form before building the welcome @mentions -
+  // a LID-based tag renders as plain unlinked text in WhatsApp clients.
+  resolveParticipantJids?: (jids: string[]) => Promise<string[]>;
 };
 
 export function createNetworkingMembershipListener(
@@ -23,6 +28,12 @@ export function createNetworkingMembershipListener(
 ): (update: GroupParticipantsUpdate) => Promise<void> {
   const queue = options.queue ?? queueService;
   const repository = options.repository ?? new NetworkingRepository();
+  const resolveParticipantJids =
+    options.resolveParticipantJids ??
+    (async (jids: string[]) => {
+      const socket = whatsapp.getSocket();
+      return socket ? resolvePhoneJids(jids, socket) : jids;
+    });
 
   return async function handleGroupParticipantsUpdate(update: GroupParticipantsUpdate): Promise<void> {
     const networkingGroups = options.networkingGroups ?? getConfiguredWhatsAppGroups().networkingGroups;
@@ -31,7 +42,7 @@ export function createNetworkingMembershipListener(
     }
 
     if (update.action === "add") {
-      const participantJids = update.participants.map((participant) => participant.id);
+      const participantJids = await resolveParticipantJids(update.participants.map((participant) => participant.id));
       await Promise.all(participantJids.map((jid) => repository.recordMembershipEvent(update.id, jid, "add")));
 
       const { text, mentions } = buildWelcomeMessage(participantJids);
@@ -48,7 +59,7 @@ export function createNetworkingMembershipListener(
     }
 
     if (update.action === "remove") {
-      const participantJids = update.participants.map((participant) => participant.id);
+      const participantJids = await resolveParticipantJids(update.participants.map((participant) => participant.id));
       await Promise.all(participantJids.map((jid) => repository.recordMembershipEvent(update.id, jid, "remove")));
 
       await queue.enqueue({

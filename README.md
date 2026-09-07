@@ -108,17 +108,20 @@ Os volumes `postgres_data` e `whatsapp_auth` preservam dados do banco e futura s
 
 ## Grupos
 
-O bot espera cinco grupos configuraveis:
+O bot espera seis grupos configuraveis:
 
 ```env
 WHATSAPP_JOBS_GROUP_1=
 WHATSAPP_JOBS_GROUP_2=
+WHATSAPP_FACULTY_JOBS_GROUP=
 WHATSAPP_EVENTS_GROUP=
 WHATSAPP_NETWORKING_GROUP_1=
 WHATSAPP_NETWORKING_GROUP_2=
 ```
 
 `WHATSAPP_NETWORKING_GROUP` ainda existe como alias legado para o primeiro grupo de networking.
+
+`WHATSAPP_FACULTY_JOBS_GROUP` e o grupo de vagas de uma faculdade parceira — recebe exatamente as mesmas vagas que `JOBS_GROUP_1`/`JOBS_GROUP_2` (`JobService.enqueueJobToJobsGroups`, `src/jobs/job.service.ts`, envia a mesma vaga pros tres grupos configurados, pulando qualquer um vazio), so que cada mensagem la ganha uma linha extra convidando pra conhecer a comunidade FullDev (`formatJobMessageForFaculty`, `src/jobs/job.formatter.ts`). O grupo tambem responde `@bot vagas de junior frontend` do mesmo jeito que os outros dois grupos de vagas.
 
 ## WhatsApp
 
@@ -158,6 +161,13 @@ Esses comandos locais leem `.env.local` e usam a sessao em `data/whatsapp`. Se o
 docker compose exec app node dist/whatsapp/cli/list-groups.js
 docker compose exec app node dist/whatsapp/cli/send-test.js 120363000000000000@g.us "Teste do bot FullDev"
 ```
+
+### Mencoes e LID
+
+WhatsApp identifica participantes de duas formas: o JID de telefone (`...@s.whatsapp.net`) ou o **LID** (`...@lid`, um identificador mais novo, independente do numero) — qual delas aparece depende do modo de endereçamento do grupo. Isso gerou dois bugs reais ja corrigidos neste projeto:
+
+1. **Detectar quando o bot e mencionado** (`isBotMentioned`, `src/shared/mentions.ts`): o campo `mentionedJid` de uma mensagem recebida pode trazer o LID do bot em vez do JID de telefone — por isso toda comparacao "isso e o bot?" verifica as duas formas (`getBotJids` retorna `[user?.id, user?.lid]`).
+2. **Construir uma mencao de saida** (responder marcando alguem, dar boas-vindas, sortear participante): o `participant.id` que a Baileys devolve pode vir em formato LID. Usar esse LID direto pra montar o texto "`@numero`" faz a mencao aparecer como **texto puro, sem virar link** no WhatsApp — o cliente so resolve o nome de contato a partir do numero de telefone de verdade. `resolvePhoneJid`/`resolvePhoneJids` (`src/shared/mentions.ts`) resolvem um LID pro JID de telefone correspondente usando o mapeamento que a propria Baileys mantem (`socket.signalRepository.lidMapping.getPNForLID`), com fallback pro LID original se ainda nao houver mapeamento conhecido. Esse resolve acontece uma unica vez, na fonte do dado (`WhatsAppConnectionManager.listParticipants`, e na extracao do remetente/participantes em `message-listener.ts`/`membership-listener.ts`), entao todo o resto do codigo (spotlight, pergunta direta, boas-vindas, resposta de mencao, "quem vai" do evento) ja recebe JIDs corretos sem precisar saber desse detalhe.
 
 ## Fila
 
@@ -327,7 +337,7 @@ NETWORKING_MENTION_COOLDOWN_HOURS=2
 
 As respostas de mencao continuam por template por padrao (`pickMentionReply`), mas podem opcionalmente usar uma IA de verdade via [Groq](https://console.groq.com) — API gratuita e compativel com o formato da OpenAI (`chat/completions`), sem cartao de credito, com limite de taxa (~30 req/min) muito acima do que essa feature usa (no maximo `NETWORKING_MENTION_MAX_PER_HOUR` por grupo). Comparado com o free tier do Gemini, cuja politica publica diz que humanos podem revisar/usar o conteudo pra treinar o modelo, o Groq (hospeda modelos abertos, nao treina os proprios) nao documenta essa pratica — mais adequado pra conteudo de um grupo real. OpenAI nao tem free tier de API (so o ChatGPT web e gratis, a API cobra desde o primeiro request).
 
-`generateMentionReply` (`src/networking/mention-ai.provider.ts`) manda o texto de quem mencionou o bot como contexto (`buildMentionPrompt`) com um system prompt fixando o tom: "dev tiozão" (programador veterano, piadas old-school de disquete/internet discada/MSN) e fã da comunidade FullDev — o mesmo personagem usado nos templates de `idle-content.ts`. Qualquer falha (sem chave configurada, timeout de 10s, rate limit, HTTP de erro, resposta vazia) cai automaticamente pro template normal — nunca trava nem derruba a resposta.
+`generateMentionReply` (`src/networking/mention-ai.provider.ts`) manda o texto de quem mencionou o bot como contexto (`buildMentionPrompt`) com um system prompt que fixa duas coisas: o tom (direto, simpatico, sem forcar piada — fa da comunidade FullDev, mas sem humor "de tiozao"/nostalgico, que foi tentado antes e o usuario pediu pra tirar) e a regra mais importante, responder de verdade ao que foi dito (sem essa regra o modelo tende a ignorar a pergunta e devolver algo aleatorio, ja visto acontecendo em producao). Qualquer falha (sem chave configurada, timeout de 10s, rate limit, HTTP de erro, resposta vazia) cai automaticamente pro template normal — nunca trava nem derruba a resposta.
 
 **Cuidado com o modelo:** o catalogo de modelos do Groq muda com frequencia — `llama-3.3-70b-versatile` (usado numa versao anterior) foi descontinuado e passou a devolver erro `model_not_found` silenciosamente absorvido pelo fallback, então o recurso ficou sempre caindo pro template sem nenhum aviso visivel. Troque de tempos em tempos pra confirmar que `GROQ_MODEL` ainda existe: `curl https://api.groq.com/openai/v1/models -H "authorization: Bearer $GROQ_API_KEY"`. O modelo atual (`openai/gpt-oss-20b`) é um modelo de raciocinio: ele gasta parte do token budget "pensando" num campo `reasoning` separado antes de escrever a resposta final — por isso o payload manda `reasoning_effort: "low"` e `max_tokens: 200` (nao só 80), senão a resposta final vem vazia (o modelo gasta tudo pensando e nunca chega a responder).
 
@@ -343,7 +353,7 @@ Pra ativar: crie uma chave gratuita em [console.groq.com](https://console.groq.c
 
 Diferente da ociosidade (reativa), estas sao mensagens em **horario fixo**, todo dia, controladas por `NETWORKING_SCHEDULED_ENABLED` (flag propria, independente de `NETWORKING_IDLE_ENABLED`):
 
-- **Spotlight** as `NETWORKING_MORNING_TIME`/`NETWORKING_LUNCH_TIME`/`NETWORKING_NIGHT_TIME` (08h/12h/20h por padrao): sorteia um participante real do grupo (via `WhatsAppConnectionManager.listParticipants`, novo, mesmo padrao de `listGroups`), exclui o proprio bot (telefone e LID — veja a nota sobre LID abaixo), evita repetir quem foi sorteado nas ultimas 24h (com fallback pro grupo inteiro se isso zerar as opcoes). Segunda e sexta usam moldes de mensagem proprios, diferentes do dia normal.
+- **Spotlight** as `NETWORKING_MORNING_TIME`/`NETWORKING_LUNCH_TIME`/`NETWORKING_NIGHT_TIME` (08h/12h/20h por padrao): sorteia um participante real do grupo (via `WhatsAppConnectionManager.listParticipants`, novo, mesmo padrao de `listGroups`), exclui o proprio bot (telefone e LID — veja "Mencoes e LID" acima), evita repetir quem foi sorteado nas ultimas 24h (com fallback pro grupo inteiro se isso zerar as opcoes). Segunda e sexta usam moldes de mensagem proprios, diferentes do dia normal.
 - **Resumo real** as `NETWORKING_SUMMARY_TIME` (18h por padrao): ao inves de spotlight, posta um resumo com dados de verdade do dia — nao e texto generico. Ve a secao Estatisticas abaixo pros numeros exatos que entram nesse resumo.
 
 Novas tabelas: `group_membership_log` (historico de entrada/saida, registrado mas nao mais exibido no resumo — ver nota abaixo), `networking_spotlight_log` (evita repetir participante).

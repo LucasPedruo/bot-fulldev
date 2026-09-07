@@ -6,18 +6,19 @@ import { logger } from "../shared/logger.js";
 // (capped at NETWORKING_MENTION_MAX_PER_HOUR replies per group). Any failure (missing key, rate
 // limit, timeout, malformed response) falls back to the existing template replies - this must
 // never block or crash the mention-reply flow.
-// Regra mais importante que o humor: SEMPRE responder de verdade ao que foi dito/perguntado.
-// Sem isso, o modelo tende a ignorar o conteúdo da mensagem e devolver uma piada aleatória sem
-// relação nenhuma com o que a pessoa disse - o que o usuário explicitamente reportou como ruim.
+// Regra mais importante: SEMPRE responder de verdade ao que foi dito/perguntado. Sem isso, o
+// modelo tende a ignorar o conteúdo da mensagem e devolver uma piada aleatória sem relação nenhuma
+// com o que a pessoa disse - relatado pelo usuário como ruim, junto com a instrução explícita de
+// não usar mais o humor "tiozão"/nostálgico que esse prompt tinha antes.
 const systemPrompt =
-  "Você é o bot da comunidade FullDev, um grupo de WhatsApp de desenvolvedores brasileiros, e é fã incondicional dessa comunidade. Você tem humor de 'dev tiozão': um programador veterano e nostálgico que conta piadas old-school e corny (estilo piada de tiozão, com trocadilho e 'kkkk'), sempre comparando a tecnologia atual com a época do disquete, internet discada, Windows 98, Turbo Pascal, MSN Messenger e Orkut. REGRA MAIS IMPORTANTE: você deve SEMPRE responder de verdade ao que a pessoa perguntou ou comentou - nunca ignore o assunto pra soltar uma piada aleatória sem relação nenhuma com a mensagem. O humor de tiozão é o tempero da resposta, não um substituto pra responder de verdade. Responda sempre em português do Brasil, em uma ou duas frases curtas (no máximo 35 palavras), sem markdown e com no máximo um emoji ou 'kkk'.";
+  "Você é o bot da comunidade FullDev, um grupo de WhatsApp de desenvolvedores brasileiros, e é fã da comunidade. Seu tom é direto, simpático e informal, sem forçar piada. REGRA MAIS IMPORTANTE: você deve SEMPRE responder de verdade ao que a pessoa perguntou ou comentou - nunca ignore o assunto pra soltar uma resposta aleatória sem relação com a mensagem. Responda sempre em português do Brasil, em uma ou duas frases curtas (no máximo 35 palavras), sem markdown e no máximo um emoji.";
 
 export function buildMentionPrompt(messageText?: string): string {
   if (messageText && messageText.trim().length > 0) {
-    return `Alguém te mencionou no grupo dizendo: "${messageText.trim()}". Responda de verdade ao que essa pessoa disse ou perguntou, temperando com seu humor de tiozão, mas sem fugir do assunto.`;
+    return `Alguém te mencionou no grupo dizendo: "${messageText.trim()}". Responda de verdade ao que essa pessoa disse ou perguntou, de forma direta e simpática, sem fugir do assunto.`;
   }
 
-  return "Alguém te mencionou no grupo, sem mais contexto na mensagem. Responda de forma engraçada e curta, no seu estilo de tiozão.";
+  return "Alguém te mencionou no grupo, sem mais contexto na mensagem. Responda de forma simpática e curta.";
 }
 
 export async function generateMentionReply(messageText?: string): Promise<string | undefined> {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatJobMessage, formatJobQueryReply } from "./job.formatter.js";
+import { formatJobMessage, formatJobMessageForFaculty, formatJobQueryReply } from "./job.formatter.js";
 import type { NormalizedJob } from "./job.types.js";
 
 void test("formatJobMessage omits absent optional fields", () => {
@@ -69,6 +69,28 @@ void test("formatJobMessage omits Remoto for on-site or hybrid jobs", () => {
 
   assert.doesNotMatch(message, /Remoto/);
   assert.match(message, /Híbrido, São Paulo/);
+});
+
+void test("formatJobMessageForFaculty includes the same job facts plus the FullDev invite", () => {
+  const job: NormalizedJob = {
+    externalId: "1",
+    source: "Jobicy",
+    title: "Backend Developer",
+    company: "Acme",
+    remote: true,
+    category: "backend",
+    technologies: [],
+    url: "https://example.com/job",
+    fingerprint: "abc",
+    discoveredAt: new Date("2026-09-05T00:00:00.000Z")
+  };
+
+  const message = formatJobMessageForFaculty(job);
+
+  assert.match(message, /Nova vaga/);
+  assert.match(message, /Backend Developer/);
+  assert.match(message, /fulldev\.com\.br/);
+  assert.match(message, /FullDev/);
 });
 
 const baseJob: NormalizedJob = {

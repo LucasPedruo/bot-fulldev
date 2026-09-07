@@ -28,7 +28,13 @@ export function createJobQnaListener(options: JobQnaListenerOptions): (message: 
       return;
     }
 
-    const jobsGroups = options.jobsGroups ?? [getConfiguredWhatsAppGroups().jobsGroup1, getConfiguredWhatsAppGroups().jobsGroup2].filter(Boolean);
+    const jobsGroups =
+      options.jobsGroups ??
+      [
+        getConfiguredWhatsAppGroups().jobsGroup1,
+        getConfiguredWhatsAppGroups().jobsGroup2,
+        getConfiguredWhatsAppGroups().facultyJobsGroup
+      ].filter(Boolean);
     if (!jobsGroups.includes(remoteJid)) {
       return;
     }

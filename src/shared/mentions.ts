@@ -1,4 +1,4 @@
-import { jidNormalizedUser } from "@whiskeysockets/baileys";
+import { jidNormalizedUser, type WASocket } from "@whiskeysockets/baileys";
 
 // WhatsApp mentions can reference either the phone-number JID (...@s.whatsapp.net) or the newer
 // LID identity (...@lid), depending on the group's addressing mode - callers must pass both of the
@@ -10,4 +10,26 @@ export function isBotMentioned(mentionedJids: string[] | null | undefined, botJi
 
   const normalizedBotJids = new Set(botJids.map(jidNormalizedUser));
   return mentionedJids.some((jid) => normalizedBotJids.has(jidNormalizedUser(jid)));
+}
+
+// Building an outgoing "@<number> tag" (or the mentions array entry) straight from a LID renders
+// as plain unlinked text in WhatsApp clients - they can only resolve a mention to a real contact
+// name from the phone-number JID. Baileys keeps a LID<->phone-number mapping (built from the
+// group's own membership data) that can resolve it; when no mapping is known yet, the original JID
+// is returned unchanged rather than throwing, since a plain-text fallback beats a crash.
+export async function resolvePhoneJid(jid: string, socket: WASocket): Promise<string> {
+  if (!jid.endsWith("@lid")) {
+    return jid;
+  }
+
+  try {
+    const phoneJid = await socket.signalRepository.lidMapping.getPNForLID(jid);
+    return phoneJid ?? jid;
+  } catch {
+    return jid;
+  }
+}
+
+export async function resolvePhoneJids(jids: string[], socket: WASocket): Promise<string[]> {
+  return Promise.all(jids.map((jid) => resolvePhoneJid(jid, socket)));
 }

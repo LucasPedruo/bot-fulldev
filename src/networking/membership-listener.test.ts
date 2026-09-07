@@ -85,6 +85,29 @@ void test("queues a welcome message mentioning every new participant", async () 
   ]);
 });
 
+void test("resolves participant LIDs to phone-number JIDs before mentioning them", async () => {
+  const queue = new FakeQueue();
+  const repository = new FakeRepository();
+  const listener = createNetworkingMembershipListener({
+    networkingGroups,
+    queue,
+    repository,
+    resolveParticipantJids: async (jids) => {
+      await Promise.resolve();
+      return jids.map((jid) => (jid === "162783622594588@lid" ? "5511999999999@s.whatsapp.net" : jid));
+    }
+  });
+
+  await listener(buildUpdate({ id: networkingGroups[0], action: "add", participants: [{ id: "162783622594588@lid" }] }));
+
+  const payload = queue.enqueued[0].payload as TextMessagePayload;
+  assert.deepEqual(payload.mentions, ["5511999999999@s.whatsapp.net"]);
+  assert.match(payload.text, /@5511999999999/);
+  assert.deepEqual(repository.recorded, [
+    { groupJid: networkingGroups[0], participantJid: "5511999999999@s.whatsapp.net", action: "add" }
+  ]);
+});
+
 void test("queues an iconic goodbye message when a participant leaves", async () => {
   const queue = new FakeQueue();
   const repository = new FakeRepository();

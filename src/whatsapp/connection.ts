@@ -15,6 +15,7 @@ import pino, { type Logger } from "pino";
 import qrcode from "qrcode-terminal";
 import { env } from "../config/env.js";
 import { logger } from "../shared/logger.js";
+import { resolvePhoneJids } from "../shared/mentions.js";
 
 export type WhatsAppConnectionStatus = "not_configured" | "connecting" | "qr_pending" | "connected" | "disconnected" | "logged_out";
 
@@ -169,7 +170,11 @@ export class WhatsAppConnectionManager {
   async listParticipants(groupJid: string): Promise<string[]> {
     const socket = this.requireConnectedSocket();
     const metadata = await socket.groupMetadata(groupJid);
-    return metadata.participants.map((participant) => participant.id);
+    const rawIds = metadata.participants.map((participant) => participant.id);
+    // Resolved to phone-number JIDs here, once, so every caller (spotlight, idle direct-question,
+    // event-promo mention-all) gets IDs that actually render as real @mentions - a LID-based tag
+    // shows as unlinked plain text in WhatsApp clients instead.
+    return resolvePhoneJids(rawIds, socket);
   }
 
   async sendText(destinationJid: string, text: string, mentions: string[] = []): Promise<void> {
