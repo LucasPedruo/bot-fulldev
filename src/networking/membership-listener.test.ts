@@ -10,6 +10,9 @@ import {
 
 const networkingGroups = ["120363000000000001@g.us", "120363000000000002@g.us"];
 
+// Most tests are not about the waiting list, so nobody is queued unless the test says so.
+const noPending = async (): Promise<number> => Promise.resolve(0);
+
 class FakeRepository implements NetworkingRepositoryLike {
   public recorded: Array<{ groupJid: string; participantJid: string; action: string }> = [];
 
@@ -53,7 +56,7 @@ function buildUpdate(input: Partial<GroupParticipantsUpdate> & Pick<GroupPartici
 
 void test("ignores group-participants updates outside the configured networking groups", async () => {
   const queue = new FakeQueue();
-  const listener = createNetworkingMembershipListener({ networkingGroups, queue });
+  const listener = createNetworkingMembershipListener({ networkingGroups, queue, countPendingRequests: noPending });
 
   await listener(buildUpdate({ id: "120363999999999999@g.us", action: "add", participants: [{ id: "5511999999999@s.whatsapp.net" }] }));
 
@@ -63,7 +66,7 @@ void test("ignores group-participants updates outside the configured networking 
 void test("queues a welcome message mentioning every new participant", async () => {
   const queue = new FakeQueue();
   const repository = new FakeRepository();
-  const listener = createNetworkingMembershipListener({ networkingGroups, queue, repository });
+  const listener = createNetworkingMembershipListener({ networkingGroups, queue, repository, countPendingRequests: noPending });
 
   await listener(
     buildUpdate({
@@ -111,7 +114,7 @@ void test("resolves participant LIDs to phone-number JIDs before mentioning them
 void test("records a departure without announcing it", async () => {
   const queue = new FakeQueue();
   const repository = new FakeRepository();
-  const listener = createNetworkingMembershipListener({ networkingGroups, queue, repository });
+  const listener = createNetworkingMembershipListener({ networkingGroups, queue, repository, countPendingRequests: noPending });
 
   await listener(buildUpdate({ id: networkingGroups[1], action: "remove", participants: [{ id: "5511999999999@s.whatsapp.net" }] }));
 
@@ -125,9 +128,91 @@ void test("records a departure without announcing it", async () => {
 
 void test("ignores promote/demote/modify actions", async () => {
   const queue = new FakeQueue();
-  const listener = createNetworkingMembershipListener({ networkingGroups, queue });
+  const listener = createNetworkingMembershipListener({ networkingGroups, queue, countPendingRequests: noPending });
 
   await listener(buildUpdate({ id: networkingGroups[0], action: "promote", participants: [{ id: "5511999999999@s.whatsapp.net" }] }));
 
   assert.deepEqual(queue.enqueued, []);
+});
+
+void test("nudges the group about the waiting list when somebody leaves", async () => {
+  const queue = new FakeQueue();
+  const repository = new FakeRepository();
+  const listener = createNetworkingMembershipListener({
+    networkingGroups,
+    queue,
+    repository,
+    countPendingRequests: async () => Promise.resolve(3)
+  });
+
+  await listener(buildUpdate({ id: networkingGroups[0], action: "remove", participants: [{ id: "5511999999999@s.whatsapp.net" }] }));
+
+  assert.equal(queue.enqueued.length, 1);
+  const payload = queue.enqueued[0].payload as TextMessagePayload;
+  assert.match(payload.text, /3 pessoas/);
+  assert.match(payload.text, /perde/i);
+  // No mentions: this is addressed to the group, not to whoever left.
+  assert.equal(payload.mentions, undefined);
+});
+
+void test("says nothing when nobody is waiting to join", async () => {
+  const queue = new FakeQueue();
+  const listener = createNetworkingMembershipListener({
+    networkingGroups,
+    queue,
+    repository: new FakeRepository(),
+    countPendingRequests: noPending
+  });
+
+  await listener(buildUpdate({ id: networkingGroups[0], action: "remove", participants: [{ id: "5511999999999@s.whatsapp.net" }] }));
+
+  assert.deepEqual(queue.enqueued, []);
+});
+
+void test("uses the singular for a single person in the queue", async () => {
+  const queue = new FakeQueue();
+  const listener = createNetworkingMembershipListener({
+    networkingGroups,
+    queue,
+    repository: new FakeRepository(),
+    countPendingRequests: async () => Promise.resolve(1)
+  });
+
+  await listener(buildUpdate({ id: networkingGroups[0], action: "remove", participants: [{ id: "5511999999999@s.whatsapp.net" }] }));
+
+  assert.match((queue.enqueued[0].payload as TextMessagePayload).text, /1 pessoa\b/);
+});
+
+void test("a departure is still recorded when the waiting list cannot be read", async () => {
+  const queue = new FakeQueue();
+  const repository = new FakeRepository();
+  const listener = createNetworkingMembershipListener({
+    networkingGroups,
+    queue,
+    repository,
+    // Reading the pending list needs admin rights the bot may not have.
+    countPendingRequests: async () => Promise.reject(new Error("forbidden"))
+  });
+
+  await assert.doesNotReject(() =>
+    listener(buildUpdate({ id: networkingGroups[0], action: "remove", participants: [{ id: "5511999999999@s.whatsapp.net" }] }))
+  );
+  assert.equal(repository.recorded.length, 1);
+  assert.deepEqual(queue.enqueued, []);
+});
+
+void test("joining does not trigger the waiting-list notice", async () => {
+  const queue = new FakeQueue();
+  const listener = createNetworkingMembershipListener({
+    networkingGroups,
+    queue,
+    repository: new FakeRepository(),
+    countPendingRequests: async () => Promise.resolve(5)
+  });
+
+  await listener(buildUpdate({ id: networkingGroups[0], action: "add", participants: [{ id: "5511999999999@s.whatsapp.net" }] }));
+
+  // Only the welcome message.
+  assert.equal(queue.enqueued.length, 1);
+  assert.match((queue.enqueued[0].payload as TextMessagePayload).text, /Bem-vindo|chegou|selecionado/i);
 });

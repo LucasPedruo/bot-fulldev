@@ -1,5 +1,5 @@
 import { env } from "../config/env.js";
-import { queueService } from "../queue/queue.service.js";
+import type { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
 import { resolvePhoneJid } from "../shared/mentions.js";
@@ -8,7 +8,6 @@ import { isLikelyRealPhoneNumber } from "../shared/phone.js";
 import { whatsapp } from "../whatsapp/client.js";
 import { getGroupCapacity } from "../whatsapp/capacity.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
-import { buildWaitlistNoticeMessage } from "./idle-content.js";
 
 // Approving a join request needs the bot to be an admin of the group - WhatsApp rejects the
 // membership_requests_action query otherwise. That failure surfaces as a thrown query error, which
@@ -32,7 +31,6 @@ export type JoinRequestServiceOptions = {
   /** Member ceiling for a group. Defaults to the per-group configuration, because real groups
    * disagree with the classic 1024 limit. */
   groupCapacity?: number | ((groupJid: string) => number);
-  waitlistNoticeCooldownHours?: number;
   queue?: QueueServiceLike;
   getSocket?: () => JoinRequestSocketLike | undefined;
   resolveJid?: (jid: string) => Promise<string>;
@@ -52,15 +50,9 @@ export type ProcessGroupResult = {
   skippedBlocked: string[];
   /** Requests left pending purely because the group has no free slot. */
   skippedNoCapacity: string[];
-  waitlistNoticeSent: boolean;
 };
 
 export class JoinRequestService {
-  // Kept in memory rather than in Postgres on purpose: the notice is a soft nudge, and the only
-  // cost of forgetting it across a restart is one extra message after a deploy - not worth a
-  // schema migration and a new table for.
-  private readonly lastWaitlistNoticeAt = new Map<string, Date>();
-
   constructor(private readonly options: JoinRequestServiceOptions = {}) {}
 
   async processAllGroups(): Promise<ProcessGroupResult[]> {
@@ -98,8 +90,7 @@ export class JoinRequestService {
       approved: [],
       skippedSuspicious: [],
       skippedBlocked: [],
-      skippedNoCapacity: [],
-      waitlistNoticeSent: false
+      skippedNoCapacity: []
     };
 
     if (!socket) {
@@ -194,38 +185,9 @@ export class JoinRequestService {
       );
     }
 
-    // The scarcity nudge only makes sense when the group is genuinely full: telling members that
-    // leaving costs them their slot is misleading when there are still free slots and the only
-    // pending requests are ones the heuristic held back for manual review.
-    if (freeSlots === 0 && result.pending > 0) {
-      result.waitlistNoticeSent = await this.sendWaitlistNotice(groupJid, result.pending);
-    }
-
     return result;
   }
 
-  private async sendWaitlistNotice(groupJid: string, pendingCount: number): Promise<boolean> {
-    const now = (this.options.now ?? (() => new Date()))();
-    const cooldownHours = this.options.waitlistNoticeCooldownHours ?? env.NETWORKING_WAITLIST_NOTICE_COOLDOWN_HOURS;
-    const lastSentAt = this.lastWaitlistNoticeAt.get(groupJid);
-
-    if (lastSentAt && now.getTime() - lastSentAt.getTime() < cooldownHours * 60 * 60 * 1000) {
-      return false;
-    }
-
-    const queue = this.options.queue ?? queueService;
-    await queue.enqueue({
-      type: "networking",
-      destinationGroup: groupJid,
-      payload: { text: buildWaitlistNoticeMessage(pendingCount) }
-      // Deliberately NOT bypassing quiet hours: unlike a join/leave event this is a recurring
-      // nudge that fires on every sweep while the group stays full.
-    });
-
-    this.lastWaitlistNoticeAt.set(groupJid, now);
-    logger.info({ groupJid, pendingCount }, "Waiting-list notice queued");
-    return true;
-  }
 }
 
 // Baileys wraps the server's refusal in a Boom error carrying the numeric status in `data`, and
@@ -254,11 +216,12 @@ export const joinRequestService = new JoinRequestService();
 // Networking always, jobs groups only when explicitly enabled. The jobs groups fill up the same
 // way and had pending requests piling up, but approving into them is a separate decision from
 // approving into networking, so it stays behind its own flag.
+//
+// The faculty jobs group is deliberately left out: it belongs to the college, not to FullDev, the
+// bot is not an admin there, and who gets into it is not ours to decide.
 export function getAutoApproveGroups(): string[] {
   const groups = getConfiguredWhatsAppGroups();
-  const jobsGroups = env.JOBS_AUTO_APPROVE_ENABLED
-    ? [groups.jobsGroup1, groups.jobsGroup2, groups.facultyJobsGroup]
-    : [];
+  const jobsGroups = env.JOBS_AUTO_APPROVE_ENABLED ? [groups.jobsGroup1, groups.jobsGroup2] : [];
 
   return [...new Set([...groups.networkingGroups, ...jobsGroups])].filter((jid) => jid.length > 0);
 }

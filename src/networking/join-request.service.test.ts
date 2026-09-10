@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { EnqueueMessageInput, QueueMessage, TextMessagePayload } from "../queue/queue.types.js";
+import type { EnqueueMessageInput, QueueMessage } from "../queue/queue.types.js";
 import {
   isForbiddenError,
   JoinRequestService,
@@ -76,7 +76,6 @@ function buildService(socket: JoinRequestSocketLike, queue: QueueServiceLike, ov
   return new JoinRequestService({
     networkingGroups: [groupJid],
     groupCapacity: 1024,
-    waitlistNoticeCooldownHours: 24,
     queue,
     getSocket: () => socket,
     resolveJid: async (jid: string) => Promise.resolve(jid),
@@ -134,52 +133,6 @@ void test("approves only up to the remaining capacity", async () => {
 
   assert.equal(result.approved.length, 2);
   assert.deepEqual(result.skippedNoCapacity, ["5531988887777@s.whatsapp.net"]);
-  // Still one free slot short of full, so no scarcity notice yet.
-  assert.equal(result.waitlistNoticeSent, false);
-});
-
-void test("posts the waiting-list notice when the group is full and people are queued", async () => {
-  const socket = new FakeSocket([{ jid: "5511987654321@s.whatsapp.net" }], 1024);
-  const queue = new FakeQueue();
-
-  const result = await buildService(socket, queue).processGroup(groupJid);
-
-  assert.equal(result.approved.length, 0);
-  assert.equal(result.waitlistNoticeSent, true);
-  assert.equal(queue.enqueued.length, 1);
-  assert.equal(queue.enqueued[0].type, "networking");
-  assert.equal(queue.enqueued[0].destinationGroup, groupJid);
-  // A recurring nudge must stay inside quiet hours.
-  assert.notEqual(queue.enqueued[0].bypassQuietHours, true);
-  assert.match((queue.enqueued[0].payload as TextMessagePayload).text, /lista de espera|fila|lotad|limite/i);
-});
-
-void test("does not repeat the waiting-list notice inside the cooldown window", async () => {
-  const socket = new FakeSocket([{ jid: "5511987654321@s.whatsapp.net" }], 1024);
-  const queue = new FakeQueue();
-  let now = new Date("2026-09-10T10:00:00Z");
-  const service = buildService(socket, queue, { now: () => now });
-
-  await service.processGroup(groupJid);
-  now = new Date("2026-09-10T20:00:00Z");
-  const second = await service.processGroup(groupJid);
-
-  assert.equal(second.waitlistNoticeSent, false);
-  assert.equal(queue.enqueued.length, 1);
-});
-
-void test("sends the waiting-list notice again once the cooldown has elapsed", async () => {
-  const socket = new FakeSocket([{ jid: "5511987654321@s.whatsapp.net" }], 1024);
-  const queue = new FakeQueue();
-  let now = new Date("2026-09-10T10:00:00Z");
-  const service = buildService(socket, queue, { now: () => now });
-
-  await service.processGroup(groupJid);
-  now = new Date("2026-09-11T11:00:00Z");
-  const second = await service.processGroup(groupJid);
-
-  assert.equal(second.waitlistNoticeSent, true);
-  assert.equal(queue.enqueued.length, 2);
 });
 
 void test("does not report a participant WhatsApp refused to approve", async () => {

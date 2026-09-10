@@ -387,12 +387,16 @@ fica pendente, porque nao ha o que validar.
 
 `NETWORKING_GROUP_CAPACITY` (padrao 1024) e o teto em que o bot para de aprovar. **1024 nao e um limite universal**: grupos ligados a uma Comunidade seguram mais (o bot ja esta em grupos de 1025 e 1114 membros). Se o valor ficar abaixo do teto real, o bot para de aprovar cedo demais e comeca a postar o aviso de lotacao com o grupo ainda tendo vaga. Por isso existe `GROUP_CAPACITY_OVERRIDES` (`<jid>:<numero>,...`): defina um teto proprio pra cada grupo que passa de 1024. Entrada malformada e ignorada em vez de derrubar o boot.
 
-`JOBS_AUTO_APPROVE_ENABLED` estende a aprovacao automatica pros grupos de vagas, que enchem do mesmo jeito. Fica atras de flag propria porque aprovar em grupo de vagas e uma decisao separada de aprovar em networking.
+`JOBS_AUTO_APPROVE_ENABLED` estende a aprovacao automatica pros grupos de vagas Vagas 1 e Vagas 2. O grupo de vagas da faculdade fica **de fora de proposito**: ele e da faculdade, nao da FullDev, o bot nao e admin la e quem entra nele nao e decisao nossa. Fica atras de flag propria porque aprovar em grupo de vagas e uma decisao separada de aprovar em networking.
 
-Quando o grupo bate o teto e ainda ha gente na fila, o bot avisa no grupo que quem sair perde a
-vaga (`buildWaitlistNoticeMessage`), no maximo uma vez a cada
-`NETWORKING_WAITLIST_NOTICE_COOLDOWN_HOURS` por grupo. Esse aviso **respeita o silencio noturno**
-(diferente das boas-vindas): e recorrente, dispara toda varredura enquanto o grupo seguir lotado.
+O aviso de lista de espera e disparado por **saida de membro**, nao pela varredura
+(`buildWaitlistNoticeMessage`, chamado no `membership-listener`): quando alguem sai de um grupo de
+networking e ha pedidos pendentes, o bot avisa que a vaga que abriu vai pra fila.
+
+> Antes ele era postado pela varredura periodica sempre que o grupo estivesse lotado, com um
+> cooldown guardado **em memoria**. Como o processo reinicia a cada deploy, o cooldown zerava e o
+> grupo recebia o mesmo aviso varias vezes no mesmo dia. Amarrar ao evento elimina a repeticao na
+> origem: nao ha estado pra perder. Nao voltar pra um gatilho agendado.
 
 ```env
 NETWORKING_AUTO_APPROVE_ENABLED=false

@@ -24,7 +24,6 @@ class FakeService {
       skippedSuspicious: [],
       skippedBlocked: [],
       skippedNoCapacity: [],
-      waitlistNoticeSent: false
     };
   }
 }

@@ -7,6 +7,13 @@ WhatsApp**: frases curtas, sem jargão interno, sem nome de arquivo.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o versionamento é
 [semântico](https://semver.org/lang/pt-BR/).
 
+## [0.4.2] - 2026-09-10
+
+### Alterado
+
+- O aviso de lista de espera agora aparece só quando alguém sai do grupo, e não mais de tempos em tempos.
+- O grupo de vagas da faculdade não recebe mais aprovação automática de entrada.
+
 ## [0.4.1] - 2026-09-10
 
 ### Corrigido

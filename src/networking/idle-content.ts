@@ -59,28 +59,27 @@ export function buildWelcomeMessage(participantJids: string[]): { text: string; 
   return { text: pickOne(welcomeTemplates)(tags), mentions: participantJids };
 }
 
-// Full-group notice: the group is at WhatsApp's ceiling and people are still queued to join.
-// The point is to make the slot feel costly - whoever leaves loses it to the next person in line.
+// Posted when somebody leaves a group that still has people queued to get in. The trigger is
+// the departure itself, not a periodic sweep: as a scheduled nudge it repeated on every deploy
+// (the cooldown lived in memory), which the user saw as the bot nagging the group all day.
 const waitlistNoticeTemplates: Array<(pending: number) => string> = [
   (pending) =>
-    `Aviso do sentinela: o grupo está lotado e tem ${describePending(pending)} na lista de espera querendo entrar. Se você sair, perde a vaga e ela vai direto para a próxima pessoa da fila.`,
+    `Abriu uma vaga no grupo, e tem ${describePending(pending)} na fila esperando para entrar. Se você sair, perde o seu lugar para a próxima pessoa da lista.`,
   (pending) =>
-    `Grupo no limite! Tem ${describePending(pending)} esperando uma vaga aqui. Quem sair, perde o lugar - e não dá para reservar.`,
+    `Saiu um, entra outro: ${describePending(pending)} está esperando uma vaga aqui. Quem sai, perde o lugar - e não dá para reservar.`,
   (pending) =>
-    `Lotação máxima atingida. ${capitalize(describePending(pending))} está na fila de espera. Saiu, perdeu: a vaga passa para o próximo automaticamente.`
+    `Uma vaga acabou de abrir e já tem quem queira: ${describePending(pending)} na lista de espera. Pense bem antes de sair, porque a volta depende de ter lugar.`
 ];
 
 export function buildWaitlistNoticeMessage(pendingCount: number): string {
   return pickOne(waitlistNoticeTemplates)(pendingCount);
 }
 
+
 function describePending(pending: number): string {
   return pending === 1 ? "1 pessoa" : `${pending} pessoas`;
 }
 
-function capitalize(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
 
 function pickOne<T>(items: readonly T[]): T {
   const index = Math.floor(Math.random() * items.length);
