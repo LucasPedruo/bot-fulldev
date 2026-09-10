@@ -385,6 +385,8 @@ geograficas (800 toll-free, 870/878 satelite, 881/882/883 redes globais, 888, 97
 porque nunca sao linha pessoal. Um LID que nao pode ser resolvido pro numero de telefone tambem
 fica pendente, porque nao ha o que validar.
 
+`NETWORKING_GROUP_CAPACITY` (padrao 1024) e o teto em que o bot para de aprovar. **1024 nao e um limite universal**: grupos ligados a uma Comunidade seguram mais (o bot ja esta em grupos de 1025 e 1114 membros). Se o valor ficar abaixo do teto real, o bot para de aprovar cedo demais e comeca a postar o aviso de lotacao com o grupo ainda tendo vaga.
+
 Quando o grupo bate o teto e ainda ha gente na fila, o bot avisa no grupo que quem sair perde a
 vaga (`buildWaitlistNoticeMessage`), no maximo uma vez a cada
 `NETWORKING_WAITLIST_NOTICE_COOLDOWN_HOURS` por grupo. Esse aviso **respeita o silencio noturno**

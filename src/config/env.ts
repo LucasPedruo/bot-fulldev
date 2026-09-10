@@ -99,8 +99,12 @@ const envSchema = z.object({
   // Auto-approving pending join requests acts on the group without a human in the loop, and it
   // needs the bot to be a group admin, so it stays opt-in like every other side-effecting feature.
   NETWORKING_AUTO_APPROVE_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
-  // WhatsApp's own hard ceiling for group members.
-  NETWORKING_GROUP_CAPACITY: z.coerce.number().int().positive().max(1024).default(1024),
+  // The member ceiling to stop approving at. 1024 is the classic WhatsApp limit and stays the
+  // default, but it is NOT a universal cap - groups linked to a Community hold more (this bot is
+  // already in groups of 1025 and 1114 members), so the value has to be configurable upwards.
+  // Set it too low and the bot stops approving early and starts posting the "group is full"
+  // notice while there is still room.
+  NETWORKING_GROUP_CAPACITY: z.coerce.number().int().positive().max(10_000).default(1024),
   // The join-request event catches requests that arrive while the bot is online; this sweep is
   // what picks up the ones that piled up while it was down.
   NETWORKING_JOIN_REQUEST_POLL_MINUTES: z.coerce.number().int().positive().default(15),
