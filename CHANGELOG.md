@@ -7,6 +7,16 @@ WhatsApp**: frases curtas, sem jargão interno, sem nome de arquivo.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o versionamento é
 [semântico](https://semver.org/lang/pt-BR/).
 
+## [0.2.1] - 2026-09-10
+
+### Adicionado
+
+- O Quackson agora se apresenta e explica como funciona nos grupos da faculdade.
+
+### Corrigido
+
+- Celulares brasileiros no formato antigo (8 dígitos) não são mais barrados na entrada dos grupos.
+
 ## [0.2.0] - 2026-09-10
 
 ### Adicionado

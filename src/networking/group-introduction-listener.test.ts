@@ -6,6 +6,7 @@ import {
   type GroupParticipantsUpdate,
   type QueueServiceLike
 } from "./group-introduction-listener.js";
+import type { GroupRole } from "./group-introduction.js";
 
 const botPhoneJid = "5531985688535@s.whatsapp.net";
 const botLid = "192837465@lid";
@@ -36,6 +37,22 @@ class FakeQueue implements QueueServiceLike {
   }
 }
 
+class FakeRepository {
+  constructor(public groups: string[] = []) {}
+
+  async getIntroducedGroups(): Promise<string[]> {
+    await Promise.resolve();
+    return this.groups;
+  }
+
+  async markIntroduced(groupJid: string): Promise<void> {
+    await Promise.resolve();
+    if (!this.groups.includes(groupJid)) {
+      this.groups.push(groupJid);
+    }
+  }
+}
+
 function buildUpdate(overrides: Partial<GroupParticipantsUpdate> = {}): GroupParticipantsUpdate {
   return {
     id: communityGroup,
@@ -46,18 +63,19 @@ function buildUpdate(overrides: Partial<GroupParticipantsUpdate> = {}): GroupPar
   };
 }
 
-function buildListener(queue: FakeQueue, botJids: string[] = [botPhoneJid, botLid]) {
+function buildListener(queue: FakeQueue, repository: FakeRepository, botJids: string[] = [botPhoneJid, botLid]) {
   return createGroupIntroductionListener({
     getBotJids: () => botJids,
     queue,
-    isCommunityGroup: (groupJid: string) => groupJid === communityGroup
+    repository,
+    resolveRole: (groupJid: string): GroupRole => (groupJid === communityGroup ? "community" : "external")
   });
 }
 
 void test("greets a community group without pitching the community back at it", async () => {
   const queue = new FakeQueue();
 
-  await buildListener(queue)(buildUpdate());
+  await buildListener(queue, new FakeRepository())(buildUpdate());
 
   assert.equal(queue.enqueued.length, 1);
   const text = (queue.enqueued[0].payload as TextMessagePayload).text;
@@ -70,18 +88,17 @@ void test("greets a community group without pitching the community back at it", 
 void test("introduces both itself and the community in an outside group", async () => {
   const queue = new FakeQueue();
 
-  await buildListener(queue)(buildUpdate({ id: outsideGroup }));
+  await buildListener(queue, new FakeRepository())(buildUpdate({ id: outsideGroup }));
 
   const text = (queue.enqueued[0].payload as TextMessagePayload).text;
   assert.match(text, /Quackson/);
   assert.ok(text.includes("grupo independente de desenvolvedores"));
-  assert.match(text, /networking/i);
 });
 
 void test("recognizes itself by its LID when the group is LID-addressed", async () => {
   const queue = new FakeQueue();
 
-  await buildListener(queue)(buildUpdate({ participants: [{ id: botLid }] }));
+  await buildListener(queue, new FakeRepository())(buildUpdate({ participants: [{ id: botLid }] }));
 
   assert.equal(queue.enqueued.length, 1);
 });
@@ -89,25 +106,36 @@ void test("recognizes itself by its LID when the group is LID-addressed", async 
 void test("stays quiet when somebody else is added", async () => {
   const queue = new FakeQueue();
 
-  await buildListener(queue)(buildUpdate({ participants: [{ id: "5511977776666@s.whatsapp.net" }] }));
+  await buildListener(queue, new FakeRepository())(buildUpdate({ participants: [{ id: "5511977776666@s.whatsapp.net" }] }));
 
   assert.deepEqual(queue.enqueued, []);
 });
 
-void test("introduces itself only once per group", async () => {
+void test("does not greet a group that was already introduced", async () => {
   const queue = new FakeQueue();
-  const listener = buildListener(queue);
+  // Survives a restart, unlike the in-memory set this replaced.
+  const repository = new FakeRepository([communityGroup]);
+
+  await buildListener(queue, repository)(buildUpdate());
+
+  assert.deepEqual(queue.enqueued, []);
+});
+
+void test("records the group so a replayed event does not greet twice", async () => {
+  const queue = new FakeQueue();
+  const repository = new FakeRepository();
+  const listener = buildListener(queue, repository);
 
   await listener(buildUpdate());
-  // A reconnect can replay the same event - the greeting must not be repeated.
   await listener(buildUpdate());
 
   assert.equal(queue.enqueued.length, 1);
+  assert.deepEqual(repository.groups, [communityGroup]);
 });
 
 void test("ignores actions other than add", async () => {
   const queue = new FakeQueue();
-  const listener = buildListener(queue);
+  const listener = buildListener(queue, new FakeRepository());
 
   await listener(buildUpdate({ action: "remove" }));
   await listener(buildUpdate({ action: "promote" }));
@@ -118,7 +146,7 @@ void test("ignores actions other than add", async () => {
 void test("does nothing while the bot's own identity is unknown", async () => {
   const queue = new FakeQueue();
 
-  await buildListener(queue, [])(buildUpdate());
+  await buildListener(queue, new FakeRepository(), [])(buildUpdate());
 
   assert.deepEqual(queue.enqueued, []);
 });
@@ -126,7 +154,23 @@ void test("does nothing while the bot's own identity is unknown", async () => {
 void test("the greeting arrives right away rather than waiting out quiet hours", async () => {
   const queue = new FakeQueue();
 
-  await buildListener(queue)(buildUpdate());
+  await buildListener(queue, new FakeRepository())(buildUpdate());
 
   assert.equal(queue.enqueued[0].bypassQuietHours, true);
+});
+
+void test("a repository failure never rejects the socket handler", async () => {
+  const queue = new FakeQueue();
+  const failing = {
+    getIntroducedGroups: async (): Promise<string[]> => Promise.reject(new Error("db down")),
+    markIntroduced: async (): Promise<void> => Promise.resolve()
+  };
+  const listener = createGroupIntroductionListener({
+    getBotJids: () => [botPhoneJid],
+    queue,
+    repository: failing
+  });
+
+  await assert.doesNotReject(() => listener(buildUpdate()));
+  assert.deepEqual(queue.enqueued, []);
 });

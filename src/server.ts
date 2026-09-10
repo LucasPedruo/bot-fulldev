@@ -7,6 +7,7 @@ import { createEventQnaListener } from "./events/event-qna-listener.js";
 import { createFacultyRelayListener } from "./faculty/faculty-relay-listener.js";
 import { createJobQnaListener } from "./jobs/job-qna-listener.js";
 import { createGroupIntroductionListener } from "./networking/group-introduction-listener.js";
+import { introductionBackfillService } from "./networking/introduction-backfill.service.js";
 import { createJoinRequestListener } from "./networking/join-request-listener.js";
 import { createNetworkingMembershipListener } from "./networking/membership-listener.js";
 import { createNetworkingMessageListener } from "./networking/message-listener.js";
@@ -125,6 +126,14 @@ async function start(): Promise<void> {
       eventCleanupScheduler.start();
     } else {
       logger.info("Events scheduler disabled");
+    }
+
+    if (env.GROUP_INTRODUCTION_ENABLED) {
+      // Covers the groups the bot was already in when the feature shipped - the join listener
+      // above only ever fires for a group it is added to while online.
+      await introductionBackfillService.run().catch((error: unknown) => {
+        logger.error({ err: error }, "Group introduction backfill failed");
+      });
     }
 
     if (env.RELEASE_ANNOUNCEMENTS_ENABLED) {
