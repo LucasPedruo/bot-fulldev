@@ -1,17 +1,14 @@
 import { env } from "../config/env.js";
 import { logger } from "../shared/logger.js";
+import { buildPersonaSystemPrompt } from "./persona.js";
 
 // Groq's free tier (https://console.groq.com) - OpenAI-compatible chat completions endpoint, no
 // credit card required, rate limits (~30 req/min) far above what this feature can ever need
 // (capped at NETWORKING_MENTION_MAX_PER_HOUR replies per group). Any failure (missing key, rate
 // limit, timeout, malformed response) falls back to the existing template replies - this must
 // never block or crash the mention-reply flow.
-// Regra mais importante: SEMPRE responder de verdade ao que foi dito/perguntado. Sem isso, o
-// modelo tende a ignorar o conteúdo da mensagem e devolver uma piada aleatória sem relação nenhuma
-// com o que a pessoa disse - relatado pelo usuário como ruim, junto com a instrução explícita de
-// não usar mais o humor "tiozão"/nostálgico que esse prompt tinha antes.
-const systemPrompt =
-  "Você é o bot da comunidade FullDev, um grupo de WhatsApp de desenvolvedores brasileiros, e é fã da comunidade. Seu tom é direto, simpático e informal, sem forçar piada. REGRA MAIS IMPORTANTE: você deve SEMPRE responder de verdade ao que a pessoa perguntou ou comentou - nunca ignore o assunto pra soltar uma resposta aleatória sem relação com a mensagem. Responda sempre em português do Brasil, em uma ou duas frases curtas (no máximo 35 palavras), sem markdown e no máximo um emoji.";
+// A identidade do Quackson (nome, personalidade e contexto da comunidade) vive em persona.ts.
+const systemPrompt = buildPersonaSystemPrompt();
 
 export function buildMentionPrompt(messageText?: string): string {
   if (messageText && messageText.trim().length > 0) {
