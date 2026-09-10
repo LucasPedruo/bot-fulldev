@@ -472,6 +472,80 @@ GROUP_INTRODUCTION_ENABLED=false
 ```
 
 
+## Moderacao dos grupos de vagas
+
+Os grupos de vagas existem so para divulgacao de vaga. Mensagem que nao e vaga (nem pedido pro bot
+filtrar vagas) e apagada, e quem mandou leva um ponto na **malha fina**. Na terceira, o membro e
+removido e fica bloqueado por `JOBS_MODERATION_BLOCK_DAYS` dias.
+
+**Admins do grupo sao isentos** — a checagem vem antes de qualquer outra coisa
+(`createJobsModerationListener`, `src/moderation/moderation-listener.ts`).
+
+Exige que o bot seja **admin** dos grupos de vagas: apagar mensagem e remover membro precisam disso.
+
+### Por que o classificador e enviesado
+
+Uma decisao errada aqui apaga a mensagem de uma pessoa real e, na terceira, tira ela da comunidade
+sem que ela entenda o motivo. Errar deixando passar uma conversa custa quase nada. Por isso o prompt
+manda **permitir sempre que houver duvida**, e todo caminho de falha resolve para permitido:
+
+- Sem `GROQ_API_KEY` → permite.
+- Timeout, HTTP de erro, resposta vazia → permite.
+- JSON invalido ou `decision` diferente da string exata `remove` → permite.
+- Nao conseguiu ler a lista de admins → **nao modera nada** (podia estar apagando mensagem de admin).
+
+`temperature: 0` para que a mesma mensagem nao seja apagada hoje e mantida amanha.
+
+**Vaga em imagem**: divulgacao costuma vir como flyer, sem texto nenhum. O listener descreve a
+imagem primeiro (mesma IA de visao da acessibilidade) e passa a descricao pro classificador — sem
+isso, uma vaga legitima seria apagada por "estar vazia". Por isso o listener de acessibilidade e
+registrado **antes** do de moderacao em `server.ts`.
+
+### Malha fina e bloqueio
+
+Estado em duas tabelas (migration `0013`):
+
+- `moderation_strikes` — contagem por pessoa **por grupo**, entao escorregar num grupo de vagas nao
+  conta pra remocao de outro.
+- `group_blocklist` — quem foi removido e ate quando. `blocked_until` e o que a aprovacao
+  automatica de entrada consulta (`JoinRequestService`): pedido de quem esta bloqueado e recusado.
+
+Ao remover, a contagem e **zerada**. Passado o bloqueio a pessoa pode voltar e tem as tres chances
+de novo, em vez de ser removida na primeira mensagem. As linhas do blocklist nao sao apagadas na
+expiracao — ficam como historico de quem foi removido e quando.
+
+O aviso de remocao e enfileirado **antes** da remocao: depois de fora do grupo a pessoa nao le mais
+nada. Avisos ignoram o silencio noturno, porque explicam uma mensagem que acabou de sumir.
+
+```env
+JOBS_MODERATION_ENABLED=false
+JOBS_MODERATION_STRIKE_LIMIT=3
+JOBS_MODERATION_BLOCK_DAYS=14
+```
+
+## Acessibilidade: descricao de imagens
+
+Toda imagem e figurinha postada em qualquer grupo vira uma descricao em texto, para que quem usa
+leitor de tela receba o conteudo em vez de silencio (`src/accessibility/`). O prompt manda
+**transcrever integralmente** qualquer texto na imagem — e a parte que mais se perde — e proibe
+especular sobre quem sao as pessoas ou o que aconteceu fora do quadro.
+
+**Precisa de um modelo multimodal.** O `GROQ_MODEL` padrao (`openai/gpt-oss-*`) e so texto e
+responde `messages[0].content must be a string` pra qualquer payload de imagem, entao o modelo de
+visao e uma variavel separada. `qwen/qwen3.8-27b` foi verificado contra a lista de modelos da conta
+e testado com imagem real antes de ser adotado como padrao — nao presumir que um modelo aceita
+imagem so pelo nome.
+
+Imagem acima de `IMAGE_DESCRIPTION_MAX_BYTES` e ignorada (base64 e ~33% maior que o arquivo, e a
+Groq recusa payload grande). Video e audio ficam de fora: exigiriam outro modelo.
+
+```env
+IMAGE_DESCRIPTION_ENABLED=false
+GROQ_VISION_MODEL=qwen/qwen3.8-27b
+IMAGE_DESCRIPTION_MAX_BYTES=3000000
+```
+
+
 ## Estatisticas
 
 Os numeros sao calculados a partir de mensagens **realmente enviadas/falhadas na fila** (`StatsService`, `src/stats/stats.service.ts`) — nao e estimativa. Por escolha do usuario, esses numeros nao tem endpoint nem comando CLI proprio: eles aparecem automaticamente dentro do resumo diario das 18h descrito acima.
@@ -576,7 +650,9 @@ src/
   jobs/
     providers/
     cli/
+  accessibility/
   faculty/
+  moderation/
   networking/
   queue/
   release/

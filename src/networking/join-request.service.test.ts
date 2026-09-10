@@ -75,6 +75,9 @@ function buildService(socket: JoinRequestSocketLike, queue: QueueServiceLike, ov
     queue,
     getSocket: () => socket,
     resolveJid: async (jid: string) => Promise.resolve(jid),
+    // Nobody is serving a moderation block unless a test says otherwise; without this the
+    // service would reach for the real repository and hit the database.
+    moderation: { isBlocked: async () => Promise.resolve(false) },
     ...overrides
   });
 }
@@ -238,6 +241,7 @@ void test("does nothing when WhatsApp is not connected", async () => {
   const service = new JoinRequestService({
     networkingGroups: [groupJid],
     queue,
+    moderation: { isBlocked: async () => Promise.resolve(false) },
     getSocket: () => undefined
   });
 
@@ -255,6 +259,7 @@ void test("processAllGroups keeps going when one group fails", async () => {
     groupCapacity: 1024,
     queue,
     resolveJid: async (jid: string) => Promise.resolve(jid),
+    moderation: { isBlocked: async () => Promise.resolve(false) },
     getSocket: () => ({
       groupMetadata: async (jid: string) => {
         await Promise.resolve();
@@ -296,6 +301,7 @@ void test("a group the bot is not admin of does not stop the other groups", asyn
     groupCapacity: 1024,
     queue,
     resolveJid: async (jid: string) => Promise.resolve(jid),
+    moderation: { isBlocked: async () => Promise.resolve(false) },
     getSocket: () => ({
       groupMetadata: async () => Promise.resolve({ participants: new Array<unknown>(10).fill({}) }),
       groupRequestParticipantsList: async (jid: string) => {
@@ -314,4 +320,33 @@ void test("a group the bot is not admin of does not stop the other groups", asyn
 
   assert.equal(results.length, 1);
   assert.deepEqual(results[0].approved, ["5511987654321@s.whatsapp.net"]);
+});
+
+void test("refuses a join request from someone still serving a moderation block", async () => {
+  const blocked = "5511987654321@s.whatsapp.net";
+  const allowed = "5521999998888@s.whatsapp.net";
+  const socket = new FakeSocket([{ jid: blocked }, { jid: allowed }], 100);
+  const queue = new FakeQueue();
+
+  const result = await buildService(socket, queue, {
+    moderation: { isBlocked: async (_g: string, jid: string) => Promise.resolve(jid === blocked) }
+  }).processGroup(groupJid);
+
+  // Otherwise somebody removed for repeated off-topic posting could walk straight back in.
+  assert.deepEqual(result.approved, [allowed]);
+  assert.deepEqual(result.skippedBlocked, [blocked]);
+  assert.deepEqual(socket.approvals[0].participants, [allowed]);
+});
+
+void test("lets a participant back in once the block has expired", async () => {
+  const returning = "5511987654321@s.whatsapp.net";
+  const socket = new FakeSocket([{ jid: returning }], 100);
+  const queue = new FakeQueue();
+
+  const result = await buildService(socket, queue, {
+    moderation: { isBlocked: async () => Promise.resolve(false) }
+  }).processGroup(groupJid);
+
+  assert.deepEqual(result.approved, [returning]);
+  assert.deepEqual(result.skippedBlocked, []);
 });

@@ -121,7 +121,19 @@ const envSchema = z.object({
   // a version it has not announced yet.
   RELEASE_ANNOUNCEMENTS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
   // Greets the group when the bot is added to it.
-  GROUP_INTRODUCTION_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false)
+  GROUP_INTRODUCTION_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  // Accessibility: turns images and stickers into a text description so blind members using a
+  // screen reader get the content instead of silence. Needs a multimodal model - the text-only
+  // GROQ_MODEL rejects image content outright.
+  IMAGE_DESCRIPTION_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  GROQ_VISION_MODEL: z.string().min(1).default("qwen/qwen3.8-27b"),
+  // Groq rejects oversized payloads, and a base64 image is ~33% larger than the file.
+  IMAGE_DESCRIPTION_MAX_BYTES: z.coerce.number().int().positive().default(3_000_000),
+  // Jobs-group moderation: deletes off-topic messages, strikes the sender, and removes them on
+  // the third strike. Admins are never touched.
+  JOBS_MODERATION_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  JOBS_MODERATION_STRIKE_LIMIT: z.coerce.number().int().min(1).default(3),
+  JOBS_MODERATION_BLOCK_DAYS: z.coerce.number().int().positive().default(14)
 });
 
 export type Env = z.infer<typeof envSchema>;

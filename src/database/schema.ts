@@ -185,3 +185,36 @@ export const eventNotifications = pgTable(
   (table) => [unique("event_notifications_event_type_unique").on(table.eventId, table.type)]
 );
 
+
+// One row per person per group. Strikes are scoped to the group so a slip in one jobs group does
+// not count towards a removal from another.
+export const moderationStrikes = pgTable(
+  "moderation_strikes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    groupJid: text("group_jid").notNull(),
+    participantJid: text("participant_jid").notNull(),
+    strikes: integer("strikes").notNull().default(0),
+    lastStrikeAt: timestamp("last_strike_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [unique("moderation_strikes_group_participant_unique").on(table.groupJid, table.participantJid)]
+);
+
+// Someone removed for hitting the strike limit. `blockedUntil` is what the join-request approver
+// checks - once it passes, the person may come back and their strikes start over.
+export const groupBlocklist = pgTable(
+  "group_blocklist",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    groupJid: text("group_jid").notNull(),
+    participantJid: text("participant_jid").notNull(),
+    blockedUntil: timestamp("blocked_until", { withTimezone: true }).notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    unique("group_blocklist_group_participant_unique").on(table.groupJid, table.participantJid),
+    index("group_blocklist_until_idx").on(table.blockedUntil)
+  ]
+);

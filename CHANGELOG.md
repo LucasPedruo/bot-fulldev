@@ -7,6 +7,19 @@ WhatsApp**: frases curtas, sem jargão interno, sem nome de arquivo.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o versionamento é
 [semântico](https://semver.org/lang/pt-BR/).
 
+## [0.3.0] - 2026-09-10
+
+### Adicionado
+
+- Moderação nos grupos de vagas: mensagem que não é vaga é apagada e o autor entra na malha fina.
+  Na terceira vez o membro é removido e fica 14 dias sem poder voltar. Administradores são isentos.
+- Acessibilidade: imagens e figurinhas enviadas nos grupos agora ganham uma descrição em texto,
+  para quem usa leitor de tela.
+
+### Removido
+
+- O aviso de atualização do bot não é mais enviado nos grupos.
+
 ## [0.2.1] - 2026-09-10
 
 ### Adicionado

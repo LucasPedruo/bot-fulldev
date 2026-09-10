@@ -3,6 +3,7 @@ import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
 import { resolvePhoneJid } from "../shared/mentions.js";
+import { moderationRepository, type ModerationRepository } from "../moderation/moderation.repository.js";
 import { isLikelyRealPhoneNumber } from "../shared/phone.js";
 import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
@@ -33,6 +34,9 @@ export type JoinRequestServiceOptions = {
   queue?: QueueServiceLike;
   getSocket?: () => JoinRequestSocketLike | undefined;
   resolveJid?: (jid: string) => Promise<string>;
+  /** Checks the moderation blocklist, so somebody removed for repeated off-topic posting cannot
+   * simply request their way back in before the block expires. */
+  moderation?: Pick<ModerationRepository, "isBlocked">;
   now?: () => Date;
 };
 
@@ -42,6 +46,8 @@ export type ProcessGroupResult = {
   approved: string[];
   /** Requests left pending because the number failed the real-number heuristic. */
   skippedSuspicious: string[];
+  /** Requests refused because the person is serving a moderation block on this group. */
+  skippedBlocked: string[];
   /** Requests left pending purely because the group has no free slot. */
   skippedNoCapacity: string[];
   waitlistNoticeSent: boolean;
@@ -89,6 +95,7 @@ export class JoinRequestService {
       pending: 0,
       approved: [],
       skippedSuspicious: [],
+      skippedBlocked: [],
       skippedNoCapacity: [],
       waitlistNoticeSent: false
     };
@@ -120,7 +127,7 @@ export class JoinRequestService {
       })
     );
 
-    const eligible = candidates.filter((candidate) => {
+    const plausible = candidates.filter((candidate) => {
       if (candidate.requestJid.length === 0) {
         return false;
       }
@@ -132,6 +139,26 @@ export class JoinRequestService {
       result.skippedSuspicious.push(candidate.phoneJid || candidate.requestJid);
       return false;
     });
+
+    // Somebody removed by the moderator for repeated off-topic posting must not be able to walk
+    // straight back in by requesting again. The block is per group and expires on its own, so
+    // this check is all that enforces the waiting period.
+    const moderation = this.options.moderation ?? moderationRepository;
+    const now = (this.options.now ?? (() => new Date()))();
+    const eligible: typeof plausible = [];
+
+    for (const candidate of plausible) {
+      if (await moderation.isBlocked(groupJid, candidate.phoneJid, now)) {
+        result.skippedBlocked.push(candidate.phoneJid);
+        continue;
+      }
+
+      eligible.push(candidate);
+    }
+
+    if (result.skippedBlocked.length > 0) {
+      logger.info({ groupJid, blocked: result.skippedBlocked }, "Join requests refused - participants still blocked");
+    }
 
     const toApprove = eligible.slice(0, freeSlots);
     result.skippedNoCapacity = eligible.slice(freeSlots).map((candidate) => candidate.phoneJid);

@@ -1,4 +1,5 @@
 import type { BaileysEventMap, WAMessage } from "@whiskeysockets/baileys";
+import { createImageDescriptionListener } from "./accessibility/image-description-listener.js";
 import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
 import { closeDatabase } from "./database/client.js";
@@ -6,6 +7,8 @@ import { runMigrations } from "./database/migrate.js";
 import { createEventQnaListener } from "./events/event-qna-listener.js";
 import { createFacultyRelayListener } from "./faculty/faculty-relay-listener.js";
 import { createJobQnaListener } from "./jobs/job-qna-listener.js";
+import { createJobsModerationListener, createWhatsAppModerationActions } from "./moderation/moderation-listener.js";
+import { ModerationService } from "./moderation/moderation.service.js";
 import { createGroupIntroductionListener } from "./networking/group-introduction-listener.js";
 import { introductionBackfillService } from "./networking/introduction-backfill.service.js";
 import { createJoinRequestListener } from "./networking/join-request-listener.js";
@@ -68,6 +71,18 @@ async function start(): Promise<void> {
 
     if (env.FACULTY_RELAY_ENABLED) {
       messageHandlers.push(createFacultyRelayListener());
+    }
+
+    // Registered BEFORE the moderation listener on purpose: handlers run in order, and a job
+    // posted as a flyer should be described (and so become classifiable) before anything decides
+    // whether to delete it.
+    if (env.IMAGE_DESCRIPTION_ENABLED) {
+      messageHandlers.push(createImageDescriptionListener());
+    }
+
+    if (env.JOBS_MODERATION_ENABLED) {
+      const moderation = new ModerationService({ actions: createWhatsAppModerationActions() });
+      messageHandlers.push(createJobsModerationListener({ service: moderation }));
     }
 
     if (env.EVENTS_POLL_ENABLED) {

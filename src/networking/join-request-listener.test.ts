@@ -22,6 +22,7 @@ class FakeService {
       pending: 0,
       approved: [],
       skippedSuspicious: [],
+      skippedBlocked: [],
       skippedNoCapacity: [],
       waitlistNoticeSent: false
     };
