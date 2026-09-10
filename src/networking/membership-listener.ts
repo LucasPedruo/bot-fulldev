@@ -5,7 +5,7 @@ import { logger } from "../shared/logger.js";
 import { resolvePhoneJids } from "../shared/mentions.js";
 import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
-import { buildWelcomeMessage, pickGoodbyeMessage } from "./idle-content.js";
+import { buildWelcomeMessage } from "./idle-content.js";
 import { NetworkingRepository } from "./networking.repository.js";
 
 export type GroupParticipantsUpdate = BaileysEventMap["group-participants.update"];
@@ -58,17 +58,12 @@ export function createNetworkingMembershipListener(
       return;
     }
 
+    // Leaving is recorded (the daily summary counts it) but never announced - the goodbye message
+    // was removed on the user's request. Do not reintroduce a message here.
     if (update.action === "remove") {
       const participantJids = await resolveParticipantJids(update.participants.map((participant) => participant.id));
       await Promise.all(participantJids.map((jid) => repository.recordMembershipEvent(update.id, jid, "remove")));
-
-      await queue.enqueue({
-        type: "networking",
-        destinationGroup: update.id,
-        payload: { text: pickGoodbyeMessage() },
-        bypassQuietHours: true
-      });
-      logger.info({ groupJid: update.id }, "Networking goodbye message queued");
+      logger.info({ groupJid: update.id }, "Networking membership removal recorded");
     }
   };
 }

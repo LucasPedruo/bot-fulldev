@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildWelcomeMessage, pickGoodbyeMessage, pickMentionCooldownMessage, pickMentionReply } from "./idle-content.js";
+import { buildWelcomeMessage, pickMentionCooldownMessage, pickMentionReply } from "./idle-content.js";
 
 void test("pickMentionReply always returns non-empty text", () => {
   for (let i = 0; i < 20; i += 1) {
@@ -24,8 +24,3 @@ void test("buildWelcomeMessage tags every new participant", () => {
   assert.deepEqual(mentions, ["5511999999999@s.whatsapp.net", "5521988888888@s.whatsapp.net"]);
 });
 
-void test("pickGoodbyeMessage always returns non-empty text", () => {
-  for (let i = 0; i < 20; i += 1) {
-    assert.ok(pickGoodbyeMessage().length > 0);
-  }
-});

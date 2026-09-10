@@ -108,18 +108,16 @@ void test("resolves participant LIDs to phone-number JIDs before mentioning them
   ]);
 });
 
-void test("queues an iconic goodbye message when a participant leaves", async () => {
+void test("records a departure without announcing it", async () => {
   const queue = new FakeQueue();
   const repository = new FakeRepository();
   const listener = createNetworkingMembershipListener({ networkingGroups, queue, repository });
 
   await listener(buildUpdate({ id: networkingGroups[1], action: "remove", participants: [{ id: "5511999999999@s.whatsapp.net" }] }));
 
-  assert.equal(queue.enqueued.length, 1);
-  assert.equal(queue.enqueued[0].destinationGroup, networkingGroups[1]);
-  const payload = queue.enqueued[0].payload as TextMessagePayload;
-  assert.ok(payload.text.length > 0);
-  assert.equal(queue.enqueued[0].bypassQuietHours, true);
+  // The goodbye message was removed on the user's request - leaving must stay silent.
+  assert.deepEqual(queue.enqueued, []);
+  // The daily summary still counts departures, so the event itself must keep being recorded.
   assert.deepEqual(repository.recorded, [
     { groupJid: networkingGroups[1], participantJid: "5511999999999@s.whatsapp.net", action: "remove" }
   ]);

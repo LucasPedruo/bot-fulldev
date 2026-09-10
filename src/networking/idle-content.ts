@@ -59,19 +59,27 @@ export function buildWelcomeMessage(participantJids: string[]): { text: string; 
   return { text: pickOne(welcomeTemplates)(tags), mentions: participantJids };
 }
 
-const goodbyeTemplates = [
-  "Puxa, não foi dessa vez que você conseguiu, mas não desista. Ligue somente durante o programa...",
-  "Saiu, perdeu o sorteio do HB20.",
-  "Esse foi de Vasco.",
-  "Menos um pra competir na vaga de júnior.",
-  "Foi um prazer, ou não. Baita call.",
-  "Mais um que preferiu produção sem testes.",
-  "Partiu sem dar merge na branch. Descanse em paz.",
-  "Deletou a conta com a mesma coragem de quem faz force push na main."
+// Full-group notice: the group is at WhatsApp's ceiling and people are still queued to join.
+// The point is to make the slot feel costly - whoever leaves loses it to the next person in line.
+const waitlistNoticeTemplates: Array<(pending: number) => string> = [
+  (pending) =>
+    `Aviso do sentinela: o grupo está lotado e tem ${describePending(pending)} na lista de espera querendo entrar. Se você sair, perde a vaga e ela vai direto para a próxima pessoa da fila.`,
+  (pending) =>
+    `Grupo no limite! Tem ${describePending(pending)} esperando uma vaga aqui. Quem sair, perde o lugar - e não dá para reservar.`,
+  (pending) =>
+    `Lotação máxima atingida. ${capitalize(describePending(pending))} está na fila de espera. Saiu, perdeu: a vaga passa para o próximo automaticamente.`
 ];
 
-export function pickGoodbyeMessage(): string {
-  return pickOne(goodbyeTemplates);
+export function buildWaitlistNoticeMessage(pendingCount: number): string {
+  return pickOne(waitlistNoticeTemplates)(pendingCount);
+}
+
+function describePending(pending: number): string {
+  return pending === 1 ? "1 pessoa" : `${pending} pessoas`;
+}
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function pickOne<T>(items: readonly T[]): T {
