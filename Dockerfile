@@ -25,5 +25,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/drizzle ./drizzle
+# Read at boot to build the release announcement posted to the groups.
+COPY --from=build /app/CHANGELOG.md ./CHANGELOG.md
 EXPOSE 3000
 CMD ["node", "dist/server.js"]
