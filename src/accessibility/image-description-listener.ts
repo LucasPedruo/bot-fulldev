@@ -1,7 +1,8 @@
-import { downloadMediaMessage, type WAMessage } from "@whiskeysockets/baileys";
+import type { WAMessage } from "@whiskeysockets/baileys";
 import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
+import { downloadMedia } from "../shared/media.js";
 import { describeImage } from "./image-description.provider.js";
 
 export type QueueServiceLike = {
@@ -49,7 +50,7 @@ export function createImageDescriptionListener(
   options: ImageDescriptionListenerOptions = {}
 ): (message: WAMessage) => Promise<void> {
   const queue = options.queue ?? queueService;
-  const download = options.download ?? ((message: WAMessage) => downloadMediaMessage(message, "buffer", {}));
+  const download = options.download ?? ((message: WAMessage) => downloadMedia(message));
   const describe = options.describe ?? describeImage;
 
   return async function handleIncomingMessage(message: WAMessage): Promise<void> {

@@ -24,12 +24,18 @@ function buildMessage(overrides: {
   fromMe?: boolean;
   text?: string;
   image?: boolean;
+  sticker?: boolean;
 }): WAMessage {
-  const { remoteJid = jobsGroup, participant = member, fromMe = false, text, image } = overrides;
+  const { remoteJid = jobsGroup, participant = member, fromMe = false, text, image, sticker } = overrides;
+  const message = sticker
+    ? { stickerMessage: { mimetype: "image/webp" } }
+    : image
+      ? { imageMessage: { mimetype: "image/jpeg" } }
+      : { conversation: text ?? "" };
 
   return {
     key: { remoteJid, participant, fromMe, id: "MSG1" },
-    message: image ? { imageMessage: { mimetype: "image/jpeg" } } : { conversation: text ?? "" }
+    message
   };
 }
 
@@ -137,5 +143,60 @@ void test("skips a message with neither text nor a describable image", async () 
   })(buildMessage({ text: "" }));
 
   assert.equal(classified, false);
+  assert.deepEqual(service.punished, []);
+});
+
+void test("deletes a sticker even when it cannot be described", async () => {
+  const service = new FakeService();
+  let classified = false;
+
+  // The production failure: the media host in the proto no longer resolved, the description came
+  // back empty, and the listener gave up - so a sticker sat in the jobs group untouched.
+  await buildListener(service, {
+    describeMedia: async () => Promise.resolve(undefined),
+    classify: async () => {
+      classified = true;
+      return Promise.resolve({ allowed: true, reason: "nunca deve ser consultado" });
+    }
+  })(buildMessage({ sticker: true }));
+
+  assert.equal(service.punished.length, 1);
+  assert.equal(service.punished[0].reason, "figurinha");
+  // A sticker is off-topic by construction, so the classifier is not even asked.
+  assert.equal(classified, false);
+});
+
+void test("deletes a sticker without ever downloading it", async () => {
+  const service = new FakeService();
+  let downloaded = false;
+
+  await buildListener(service, {
+    describeMedia: async () => {
+      downloaded = true;
+      return Promise.resolve("um passarinho verde");
+    }
+  })(buildMessage({ sticker: true }));
+
+  assert.equal(service.punished.length, 1);
+  assert.equal(downloaded, false);
+});
+
+void test("an admin's sticker is still left alone", async () => {
+  const service = new FakeService();
+
+  await buildListener(service, { isGroupAdmin: alwaysAdmin })(buildMessage({ participant: admin, sticker: true }));
+
+  assert.deepEqual(service.punished, []);
+});
+
+void test("keeps an image it could not describe instead of deleting blind", async () => {
+  const service = new FakeService();
+
+  // It could be a flyer with a real vacancy; deleting on a failed download would punish someone
+  // for our own outage.
+  await buildListener(service, { describeMedia: async () => Promise.resolve(undefined) })(
+    buildMessage({ image: true })
+  );
+
   assert.deepEqual(service.punished, []);
 });

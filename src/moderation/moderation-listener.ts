@@ -1,8 +1,9 @@
-import { downloadMediaMessage, type WAMessage, type WAMessageKey } from "@whiskeysockets/baileys";
+import type { WAMessage, WAMessageKey } from "@whiskeysockets/baileys";
 import { describeImage } from "../accessibility/image-description.provider.js";
 import { findDescribableMedia } from "../accessibility/image-description-listener.js";
 import { createAdminChecker } from "../faculty/faculty-relay-listener.js";
 import { logger } from "../shared/logger.js";
+import { downloadMedia } from "../shared/media.js";
 import { extractMessageText } from "../shared/messages.js";
 import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
@@ -57,12 +58,38 @@ export function createJobsModerationListener(
     }
 
     const text = extractMessageText(message) ?? "";
+    const media = findDescribableMedia(message);
+
+    // A sticker is never a job posting and never a request to filter vacancies, so it is
+    // off-topic by construction - no classifier needed. This is decided BEFORE any download,
+    // because the previous version asked for a description first and silently gave up when that
+    // failed: a sticker slipped through the jobs group in production exactly that way, since the
+    // media host in its proto no longer resolves and the vision model rejects animated WebP.
+    if (media?.isSticker) {
+      await service.punish({
+        groupJid,
+        participantJid: senderJid,
+        messageKey: message.key,
+        reason: "figurinha"
+      });
+      return;
+    }
+
     // A job posted as a flyer carries no text. Judging it on the text alone would delete a valid
     // posting for being empty, so the image is described first and fed to the classifier.
     const imageDescription = await describeMedia(message);
 
-    if (text.trim().length === 0 && !imageDescription) {
-      return;
+    if (text.trim().length === 0) {
+      // An image we could not describe is genuinely unjudgeable, and it could well be a flyer
+      // with a real vacancy. Deleting on a failed download would be punishing someone for our
+      // own outage, so it stays - logged, so the gap is visible rather than silent.
+      if (!imageDescription) {
+        if (media) {
+          logger.warn({ groupJid }, "Could not describe the image - leaving it in place rather than deleting blind");
+        }
+
+        return;
+      }
     }
 
     const decision = await classify(text, imageDescription);
@@ -87,7 +114,7 @@ async function defaultDescribeMedia(message: WAMessage): Promise<string | undefi
   }
 
   try {
-    const data = await downloadMediaMessage(message, "buffer", {});
+    const data = await downloadMedia(message);
     return await describeImage({ data, mimeType: media.mimeType, isSticker: media.isSticker });
   } catch (error) {
     logger.warn({ err: error }, "Could not describe media for moderation");
