@@ -105,6 +105,12 @@ const envSchema = z.object({
   // Set it too low and the bot stops approving early and starts posting the "group is full"
   // notice while there is still room.
   NETWORKING_GROUP_CAPACITY: z.coerce.number().int().positive().max(10_000).default(1024),
+  // Per-group ceilings, as "<jid>:<number>,<jid>:<number>". Real groups disagree with the
+  // default: FullDev - Vagas 1 already holds 1025 members and a PUC group holds 1114, so a
+  // single global number would make the bot refuse to approve into groups that still have room.
+  GROUP_CAPACITY_OVERRIDES: z.string().optional().default(""),
+  // Extends the join-request approval to the jobs groups, which fill up the same way.
+  JOBS_AUTO_APPROVE_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
   // The join-request event catches requests that arrive while the bot is online; this sweep is
   // what picks up the ones that piled up while it was down.
   NETWORKING_JOIN_REQUEST_POLL_MINUTES: z.coerce.number().int().positive().default(15),

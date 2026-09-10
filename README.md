@@ -385,7 +385,9 @@ geograficas (800 toll-free, 870/878 satelite, 881/882/883 redes globais, 888, 97
 porque nunca sao linha pessoal. Um LID que nao pode ser resolvido pro numero de telefone tambem
 fica pendente, porque nao ha o que validar.
 
-`NETWORKING_GROUP_CAPACITY` (padrao 1024) e o teto em que o bot para de aprovar. **1024 nao e um limite universal**: grupos ligados a uma Comunidade seguram mais (o bot ja esta em grupos de 1025 e 1114 membros). Se o valor ficar abaixo do teto real, o bot para de aprovar cedo demais e comeca a postar o aviso de lotacao com o grupo ainda tendo vaga.
+`NETWORKING_GROUP_CAPACITY` (padrao 1024) e o teto em que o bot para de aprovar. **1024 nao e um limite universal**: grupos ligados a uma Comunidade seguram mais (o bot ja esta em grupos de 1025 e 1114 membros). Se o valor ficar abaixo do teto real, o bot para de aprovar cedo demais e comeca a postar o aviso de lotacao com o grupo ainda tendo vaga. Por isso existe `GROUP_CAPACITY_OVERRIDES` (`<jid>:<numero>,...`): defina um teto proprio pra cada grupo que passa de 1024. Entrada malformada e ignorada em vez de derrubar o boot.
+
+`JOBS_AUTO_APPROVE_ENABLED` estende a aprovacao automatica pros grupos de vagas, que enchem do mesmo jeito. Fica atras de flag propria porque aprovar em grupo de vagas e uma decisao separada de aprovar em networking.
 
 Quando o grupo bate o teto e ainda ha gente na fila, o bot avisa no grupo que quem sair perde a
 vaga (`buildWaitlistNoticeMessage`), no maximo uma vez a cada
@@ -535,6 +537,8 @@ responde `messages[0].content must be a string` pra qualquer payload de imagem, 
 visao e uma variavel separada. `qwen/qwen3.8-27b` foi verificado contra a lista de modelos da conta
 e testado com imagem real antes de ser adotado como padrao — nao presumir que um modelo aceita
 imagem so pelo nome.
+
+Figurinha do WhatsApp e **WebP, quase sempre animado**, e o modelo de visao responde `invalid image data` pra esse formato — foi o que aconteceu em producao. Por isso a imagem passa por `normalizeForVision` (`sharp`) antes: WebP/GIF/AVIF viram PNG de um frame so, e imagem acima de 1400px e reduzida. A normalizacao acontece **antes** da checagem de tamanho, porque e justamente ela que traz a imagem pra baixo do limite. Se a conversao falhar, manda o original em vez de perder a descricao.
 
 Imagem acima de `IMAGE_DESCRIPTION_MAX_BYTES` e ignorada (base64 e ~33% maior que o arquivo, e a
 Groq recusa payload grande). Video e audio ficam de fora: exigiriam outro modelo.

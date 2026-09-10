@@ -6,6 +6,7 @@ import { resolvePhoneJid } from "../shared/mentions.js";
 import { moderationRepository, type ModerationRepository } from "../moderation/moderation.repository.js";
 import { isLikelyRealPhoneNumber } from "../shared/phone.js";
 import { whatsapp } from "../whatsapp/client.js";
+import { getGroupCapacity } from "../whatsapp/capacity.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
 import { buildWaitlistNoticeMessage } from "./idle-content.js";
 
@@ -28,8 +29,9 @@ export type QueueServiceLike = {
 
 export type JoinRequestServiceOptions = {
   networkingGroups?: string[];
-  /** Hard member ceiling for a group. WhatsApp's own limit is 1024. */
-  groupCapacity?: number;
+  /** Member ceiling for a group. Defaults to the per-group configuration, because real groups
+   * disagree with the classic 1024 limit. */
+  groupCapacity?: number | ((groupJid: string) => number);
   waitlistNoticeCooldownHours?: number;
   queue?: QueueServiceLike;
   getSocket?: () => JoinRequestSocketLike | undefined;
@@ -62,7 +64,7 @@ export class JoinRequestService {
   constructor(private readonly options: JoinRequestServiceOptions = {}) {}
 
   async processAllGroups(): Promise<ProcessGroupResult[]> {
-    const groups = this.options.networkingGroups ?? getConfiguredWhatsAppGroups().networkingGroups;
+    const groups = this.options.networkingGroups ?? getAutoApproveGroups();
     const results: ProcessGroupResult[] = [];
 
     for (const groupJid of groups) {
@@ -111,7 +113,9 @@ export class JoinRequestService {
 
     result.pending = requests.length;
 
-    const capacity = this.options.groupCapacity ?? env.NETWORKING_GROUP_CAPACITY;
+    const configured = this.options.groupCapacity;
+    const capacity =
+      typeof configured === "function" ? configured(groupJid) : (configured ?? getGroupCapacity(groupJid));
     const metadata = await socket.groupMetadata(groupJid);
     const freeSlots = Math.max(0, capacity - metadata.participants.length);
 
@@ -250,3 +254,15 @@ async function defaultResolveJid(jid: string): Promise<string> {
 }
 
 export const joinRequestService = new JoinRequestService();
+
+// Networking always, jobs groups only when explicitly enabled. The jobs groups fill up the same
+// way and had pending requests piling up, but approving into them is a separate decision from
+// approving into networking, so it stays behind its own flag.
+export function getAutoApproveGroups(): string[] {
+  const groups = getConfiguredWhatsAppGroups();
+  const jobsGroups = env.JOBS_AUTO_APPROVE_ENABLED
+    ? [groups.jobsGroup1, groups.jobsGroup2, groups.facultyJobsGroup]
+    : [];
+
+  return [...new Set([...groups.networkingGroups, ...jobsGroups])].filter((jid) => jid.length > 0);
+}

@@ -1,5 +1,6 @@
 import { env } from "../config/env.js";
 import { logger } from "../shared/logger.js";
+import { normalizeForVision } from "./image-normalizer.js";
 
 // Accessibility feature: a blind member using a screen reader gets nothing at all from an image
 // or a sticker. This turns it into text so the content is actually reachable.
@@ -30,9 +31,14 @@ export async function describeImage(input: DescribeImageInput): Promise<string |
     return undefined;
   }
 
-  if (input.data.length > env.IMAGE_DESCRIPTION_MAX_BYTES) {
+  // Normalized BEFORE the size check: converting an animated WebP or scaling a large photo is
+  // exactly what brings it under the limit, so checking first would reject images that are
+  // perfectly describable.
+  const normalized = await normalizeForVision(input.data, input.mimeType);
+
+  if (normalized.data.length > env.IMAGE_DESCRIPTION_MAX_BYTES) {
     logger.warn(
-      { bytes: input.data.length, limit: env.IMAGE_DESCRIPTION_MAX_BYTES },
+      { bytes: normalized.data.length, limit: env.IMAGE_DESCRIPTION_MAX_BYTES },
       "Image too large to describe, skipping"
     );
     return undefined;
@@ -42,8 +48,7 @@ export async function describeImage(input: DescribeImageInput): Promise<string |
   const timeout = setTimeout(() => controller.abort(), 25_000);
 
   try {
-    // WhatsApp stickers are WebP; the vision endpoint takes them as a normal data URI.
-    const dataUri = `data:${input.mimeType};base64,${input.data.toString("base64")}`;
+    const dataUri = `data:${normalized.mimeType};base64,${normalized.data.toString("base64")}`;
     const instruction = input.isSticker
       ? "Descreva esta figurinha em no máximo 20 palavras, incluindo qualquer texto que apareça nela."
       : "Descreva esta imagem para alguém que não pode vê-la, transcrevendo todo texto presente.";

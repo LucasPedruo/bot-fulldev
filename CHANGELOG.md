@@ -7,6 +7,13 @@ WhatsApp**: frases curtas, sem jargão interno, sem nome de arquivo.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o versionamento é
 [semântico](https://semver.org/lang/pt-BR/).
 
+## [0.4.0] - 2026-09-10
+
+### Adicionado
+
+- Pedidos de entrada nos grupos de vagas agora também são aprovados automaticamente.
+- Figurinhas animadas agora ganham descrição de acessibilidade (antes falhavam).
+
 ## [0.3.1] - 2026-09-10
 
 ### Corrigido
