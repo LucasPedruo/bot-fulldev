@@ -340,9 +340,15 @@ function matchCountryCallingCode(digits: string): string | undefined {
   return undefined;
 }
 
-// After the +55, a Brazilian number is a 2-digit area code followed by either a 9-digit mobile
-// number (always starting with 9) or an 8-digit landline (starting 2-5). WhatsApp accounts are
-// overwhelmingly mobile, but landlines can register, so both are accepted.
+// After the +55, a Brazilian number is a 2-digit area code followed by the subscriber number:
+//
+//   9 digits, starting with 9  -> mobile in the current national plan
+//   8 digits, starting with 6-9 -> mobile in the pre-2016 plan
+//   8 digits, starting with 2-5 -> landline
+//
+// The 8-digit mobile case is not a historical curiosity: WhatsApp stores plenty of Brazilian
+// accounts without the ninth digit, so their JID arrives in the legacy form. Rejecting it left
+// real people (e.g. 55 79 9147-2437, seen in production) stuck pending forever.
 function isValidBrazilianNumber(national: string): boolean {
   const areaCode = national.slice(0, 2);
   const subscriber = national.slice(2);
@@ -356,7 +362,7 @@ function isValidBrazilianNumber(national: string): boolean {
   }
 
   if (subscriber.length === 8) {
-    return /^[2-5]/.test(subscriber);
+    return /^[2-9]/.test(subscriber);
   }
 
   return false;

@@ -380,7 +380,7 @@ decidir. Nao trocar isso por rejeicao automatica: um falso positivo barraria uma
 A heuristica (`isLikelyRealPhoneNumber`, `src/shared/phone.ts`) e validacao de formato, nao
 deteccao de bot — **o WhatsApp nao expoe nenhum sinal de "isso e um bot"**. Ela checa E.164
 (8 a 15 digitos), codigo de pais **geografico** atribuido, e para `+55` o plano brasileiro inteiro
-(DDD alocado, celular de 9 digitos comecando em 9, fixo de 8 comecando em 2-5). Faixas nao
+(DDD alocado; celular de 9 digitos comecando em 9, celular legado de 8 digitos comecando em 6-9, fixo de 8 comecando em 2-5 — **o WhatsApp guarda muito numero BR sem o nono digito**, entao recusar o formato de 8 digitos barrava gente real). Faixas nao
 geograficas (800 toll-free, 870/878 satelite, 881/882/883 redes globais, 888, 979) sao recusadas
 porque nunca sao linha pessoal. Um LID que nao pode ser resolvido pro numero de telefone tambem
 fica pendente, porque nao ha o que validar.

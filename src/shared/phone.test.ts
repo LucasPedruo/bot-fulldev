@@ -35,6 +35,19 @@ void test("rejects Brazilian 9-digit numbers that do not start with 9", () => {
   assert.equal(isLikelyRealPhoneNumber("5511887654321@s.whatsapp.net"), false);
 });
 
+void test("accepts legacy 8-digit Brazilian mobile numbers", () => {
+  // WhatsApp stores many Brazilian accounts without the ninth digit, so their JID arrives in the
+  // pre-2016 form. This exact number was left pending in production by the stricter rule.
+  assert.equal(isLikelyRealPhoneNumber("557991472437@s.whatsapp.net"), true);
+  assert.equal(isLikelyRealPhoneNumber("551188887777@s.whatsapp.net"), true);
+  assert.equal(isLikelyRealPhoneNumber("552176665555@s.whatsapp.net"), true);
+});
+
+void test("still rejects an 8-digit Brazilian number starting with 0 or 1", () => {
+  assert.equal(isLikelyRealPhoneNumber("551101234567@s.whatsapp.net"), false);
+  assert.equal(isLikelyRealPhoneNumber("551112345678@s.whatsapp.net"), false);
+});
+
 void test("rejects Brazilian numbers of the wrong length", () => {
   assert.equal(isLikelyRealPhoneNumber("55119876543@s.whatsapp.net"), false);
   assert.equal(isLikelyRealPhoneNumber("55119876543210@s.whatsapp.net"), false);
