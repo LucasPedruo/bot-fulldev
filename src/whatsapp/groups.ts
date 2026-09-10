@@ -37,10 +37,15 @@ export function getConfiguredWhatsAppGroups(): ConfiguredWhatsAppGroups {
   };
 }
 
-// Every group the bot is deliberately configured to operate in. Two features depend on this: the
-// release announcement (which groups hear about an update) and the self-introduction (a group in
-// this list belongs to the FullDev/college community, so it gets the short greeting instead of the
-// full "who I am and what FullDev is" pitch).
+// Groups the bot only ever reads from. It must never post into these, so every outgoing broadcast
+// has to exclude them.
+function getReadOnlyGroupJids(): string[] {
+  return [getConfiguredWhatsAppGroups().eixoRepresentativesGroup].filter((jid) => jid.length > 0);
+}
+
+// Every group the bot is deliberately configured to operate in, read-only ones included. Used to
+// decide whether a group is already part of the FullDev/college world: one in this list gets the
+// short greeting instead of the full "who I am and what FullDev is" pitch.
 export function getAllConfiguredGroupJids(): string[] {
   const groups = getConfiguredWhatsAppGroups();
 
@@ -60,6 +65,14 @@ export function getAllConfiguredGroupJids(): string[] {
 
 export function isConfiguredGroup(groupJid: string): boolean {
   return getAllConfiguredGroupJids().includes(groupJid);
+}
+
+// Where a broadcast (today: the release announcement) may be posted. Same list minus the
+// read-only groups - announcing an update inside the professors' group would be the bot writing
+// somewhere it was never meant to write.
+export function getBroadcastGroupJids(): string[] {
+  const readOnly = new Set(getReadOnlyGroupJids());
+  return getAllConfiguredGroupJids().filter((jid) => !readOnly.has(jid));
 }
 
 function unique(jids: string[]): string[] {

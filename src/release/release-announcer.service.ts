@@ -1,7 +1,7 @@
 import { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
-import { getAllConfiguredGroupJids } from "../whatsapp/groups.js";
+import { getBroadcastGroupJids } from "../whatsapp/groups.js";
 import { formatReleaseAnnouncement, readCurrentVersion, readReleaseNote, type ReleaseNote } from "./release-notes.js";
 import { releaseRepository, type ReleaseRepository } from "./release.repository.js";
 
@@ -48,7 +48,7 @@ export class ReleaseAnnouncerService {
       return { announced: false, version, groups: [], reason: "no_changelog_entry" };
     }
 
-    const groups = this.options.groups ?? getAllConfiguredGroupJids();
+    const groups = this.options.groups ?? getBroadcastGroupJids();
 
     if (groups.length === 0) {
       return { announced: false, version, groups: [], reason: "no_groups" };

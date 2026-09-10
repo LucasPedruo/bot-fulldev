@@ -403,7 +403,8 @@ NETWORKING_WAITLIST_NOTICE_COOLDOWN_HOURS=24
 
 Le o grupo "Representantes de eixo" (onde as professoras divulgam eventos) e posta um resumo no
 grupo "Eventos e oportunidades" da comunidade da faculdade. O bot **so le** o grupo de origem —
-nunca escreve nele.
+nunca escreve nele. Por isso ele fica fora de `getBroadcastGroupJids()`, entao nem o aviso de
+atualizacao cai la dentro.
 
 Filtro: **apenas mensagens de admins** do grupo de origem (`createAdminChecker`,
 `src/faculty/faculty-relay-listener.ts`), que sao as professoras e os representantes. Conversa de
@@ -434,7 +435,7 @@ FACULTY_RELAY_DEBOUNCE_MINUTES=5
 
 Toda atualizacao entra no `CHANGELOG.md` na raiz (formato Keep a Changelog). No boot, se a versao
 do `package.json` for diferente da ultima ja anunciada, o bot posta versao + os itens daquela
-entrada em **todos os grupos configurados** (`ReleaseAnnouncerService`,
+entrada em todos os grupos configurados **menos os de leitura** (`ReleaseAnnouncerService`,
 `src/release/release-announcer.service.ts`).
 
 A ultima versao anunciada fica no Postgres (`app_metadata`, chave `last_announced_version`), nao em
