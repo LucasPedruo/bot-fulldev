@@ -43,6 +43,11 @@ class FakeSocket implements JoinRequestSocketLike {
     private readonly failFor: string[] = []
   ) {}
 
+  /** Every identity the socket was ever asked to approve, across retries. */
+  get attempted(): string[] {
+    return this.approvals.flatMap((call) => call.participants);
+  }
+
   async groupMetadata(): Promise<{ participants: unknown[] }> {
     await Promise.resolve();
     return { participants: new Array<unknown>(this.memberCount).fill({}) };
@@ -349,4 +354,66 @@ void test("lets a participant back in once the block has expired", async () => {
 
   assert.deepEqual(result.approved, [returning]);
   assert.deepEqual(result.skippedBlocked, []);
+});
+
+void test("retries a rejected LID approval against the phone-number form", async () => {
+  const lid = "150156787855413@lid";
+  const phone = "5511987654321@s.whatsapp.net";
+  // Production: a jobs group returned every pending request as a LID and WhatsApp answered 500
+  // to all ten, while a group reporting phone-number JIDs approved fine.
+  const socket = new FakeSocket([{ jid: lid, phone_number: phone }], 100, [lid]);
+  const queue = new FakeQueue();
+
+  const result = await buildService(socket, queue).processGroup(groupJid);
+
+  assert.deepEqual(result.approved, [phone]);
+  assert.deepEqual(socket.attempted, [lid, phone]);
+});
+
+void test("does not retry when the first attempt already worked", async () => {
+  const phone = "5511987654321@s.whatsapp.net";
+  const socket = new FakeSocket([{ jid: phone }], 100);
+  const queue = new FakeQueue();
+
+  await buildService(socket, queue).processGroup(groupJid);
+
+  assert.deepEqual(socket.attempted, [phone]);
+});
+
+void test("gives up when neither identity is accepted", async () => {
+  const lid = "150156787855413@lid";
+  const phone = "5511987654321@s.whatsapp.net";
+  // Both refused means the group itself is refusing - most likely genuinely full.
+  const socket = new FakeSocket([{ jid: lid, phone_number: phone }], 100, [lid, phone]);
+  const queue = new FakeQueue();
+
+  const result = await buildService(socket, queue).processGroup(groupJid);
+
+  assert.deepEqual(result.approved, []);
+  assert.deepEqual(socket.attempted, [lid, phone]);
+});
+
+void test("does not retry when there is no distinct phone-number form", async () => {
+  const phone = "5511987654321@s.whatsapp.net";
+  const socket = new FakeSocket([{ jid: phone }], 100, [phone]);
+  const queue = new FakeQueue();
+
+  const result = await buildService(socket, queue).processGroup(groupJid);
+
+  assert.deepEqual(result.approved, []);
+  // Retrying the identical identity would just be a second pointless call.
+  assert.deepEqual(socket.attempted, [phone]);
+});
+
+void test("retries only the rejected ones, keeping the accepted approvals", async () => {
+  const okPhone = "5521999998888@s.whatsapp.net";
+  const lid = "150156787855413@lid";
+  const retryPhone = "5511987654321@s.whatsapp.net";
+  const socket = new FakeSocket([{ jid: okPhone }, { jid: lid, phone_number: retryPhone }], 100, [lid]);
+  const queue = new FakeQueue();
+
+  const result = await buildService(socket, queue).processGroup(groupJid);
+
+  assert.deepEqual(result.approved.sort(), [retryPhone, okPhone].sort());
+  assert.deepEqual(socket.approvals[1].participants, [retryPhone]);
 });

@@ -7,6 +7,12 @@ WhatsApp**: frases curtas, sem jargão interno, sem nome de arquivo.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o versionamento é
 [semântico](https://semver.org/lang/pt-BR/).
 
+## [0.4.1] - 2026-09-10
+
+### Corrigido
+
+- Pedidos de entrada que o WhatsApp recusava agora são tentados novamente pelo número de telefone.
+
 ## [0.4.0] - 2026-09-10
 
 ### Adicionado

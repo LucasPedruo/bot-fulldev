@@ -123,8 +123,9 @@ export class JoinRequestService {
     const candidates = await Promise.all(
       requests.map(async (request) => {
         // WhatsApp identifies the requester by "jid", and on LID-addressed groups also hands over
-        // the phone-number form in "phone_number". The approval call must echo back the exact jid
-        // WhatsApp gave us, while the heuristic needs the phone-number form - so both are kept.
+        // the phone-number form in "phone_number". Both are kept: the heuristic and the blocklist
+        // need the phone-number form, while the approval is attempted with the jid WhatsApp gave
+        // and retried against the phone number when that is refused (see approveAll).
         const requestJid = request.jid ?? request.phone_number ?? "";
         const phoneJid = request.phone_number ?? (await resolveJid(requestJid));
         return { requestJid, phoneJid };
@@ -168,25 +169,20 @@ export class JoinRequestService {
     result.skippedNoCapacity = eligible.slice(freeSlots).map((candidate) => candidate.phoneJid);
 
     if (toApprove.length > 0) {
-      const outcomes = await socket.groupRequestParticipantsUpdate(
-        groupJid,
-        toApprove.map((candidate) => candidate.requestJid),
-        "approve"
-      );
+      const approvedJids = new Set(await approveAll(socket, groupJid, toApprove));
 
-      // WhatsApp answers per participant, so a partial failure (e.g. the person cancelled the
-      // request in the meantime) must not be reported as an approval.
-      const failed = outcomes.filter((outcome) => outcome.status !== "200" && outcome.status !== "success");
       result.approved = toApprove
-        .filter((candidate) => !failed.some((outcome) => outcome.jid === candidate.requestJid))
+        .filter((candidate) => approvedJids.has(candidate.requestJid))
         .map((candidate) => candidate.phoneJid);
 
-      if (failed.length > 0) {
-        logger.warn({ groupJid, failed }, "Some join request approvals were rejected by WhatsApp");
-      }
-
       logger.info(
-        { groupJid, approved: result.approved.length, members: metadata.participants.length, capacity },
+        {
+          groupJid,
+          approved: result.approved.length,
+          attempted: toApprove.length,
+          members: metadata.participants.length,
+          capacity
+        },
         "Join requests approved"
       );
     }
@@ -265,4 +261,80 @@ export function getAutoApproveGroups(): string[] {
     : [];
 
   return [...new Set([...groups.networkingGroups, ...jobsGroups])].filter((jid) => jid.length > 0);
+}
+
+type ApprovalCandidate = { requestJid: string; phoneJid: string };
+
+function isAccepted(status: string): boolean {
+  return status === "200" || status === "success";
+}
+
+// WhatsApp hands the pending list back in whichever addressing mode the group uses, so `jid` can
+// be a LID. Echoing that LID straight back was rejected with a blanket 500 for all ten pending
+// requests of a jobs group in production, while a group that reported phone-number JIDs approved
+// fine - so the LID form is retried against the resolved phone number before giving up.
+//
+// The 500 carries no detail, and "the group is genuinely full" produces the same code, which is
+// why the outcome of each attempt is logged: the two causes are only distinguishable from whether
+// the retry succeeds.
+async function approveAll(
+  socket: JoinRequestSocketLike,
+  groupJid: string,
+  candidates: ApprovalCandidate[]
+): Promise<string[]> {
+  const outcomes = await socket.groupRequestParticipantsUpdate(
+    groupJid,
+    candidates.map((candidate) => candidate.requestJid),
+    "approve"
+  );
+
+  const accepted = new Set(outcomes.filter((outcome) => isAccepted(outcome.status)).map((outcome) => outcome.jid));
+  const approved = candidates.filter((candidate) => accepted.has(candidate.requestJid)).map((c) => c.requestJid);
+
+  // Only worth retrying where the identity we sent differs from the phone-number form.
+  const retryable = candidates.filter(
+    (candidate) =>
+      !accepted.has(candidate.requestJid) &&
+      candidate.phoneJid.length > 0 &&
+      candidate.phoneJid !== candidate.requestJid &&
+      candidate.phoneJid.endsWith("@s.whatsapp.net")
+  );
+
+  if (retryable.length === 0) {
+    if (approved.length < candidates.length) {
+      logger.warn(
+        { groupJid, attempted: candidates.length, approved: approved.length, outcomes },
+        "WhatsApp rejected some join request approvals and there is no phone-number form to retry with"
+      );
+    }
+
+    return approved;
+  }
+
+  const retryOutcomes = await socket.groupRequestParticipantsUpdate(
+    groupJid,
+    retryable.map((candidate) => candidate.phoneJid),
+    "approve"
+  );
+
+  const retryAccepted = new Set(
+    retryOutcomes.filter((outcome) => isAccepted(outcome.status)).map((outcome) => outcome.jid)
+  );
+  const recovered = retryable.filter((candidate) => retryAccepted.has(candidate.phoneJid));
+
+  logger.info(
+    { groupJid, retried: retryable.length, recovered: recovered.length },
+    "Retried rejected approvals using the phone-number form"
+  );
+
+  if (recovered.length < retryable.length) {
+    // Neither identity worked, so the refusal is about the group (most likely genuinely full),
+    // not about how the participant was addressed.
+    logger.warn(
+      { groupJid, stillRejected: retryable.length - recovered.length, outcomes: retryOutcomes },
+      "Approvals rejected under both identities - the group is likely at its real member limit"
+    );
+  }
+
+  return [...approved, ...recovered.map((candidate) => candidate.requestJid)];
 }
