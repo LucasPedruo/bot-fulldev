@@ -108,7 +108,7 @@ Os volumes `postgres_data` e `whatsapp_auth` preservam dados do banco e futura s
 
 ## Grupos
 
-O bot espera seis grupos configuraveis:
+O bot espera oito grupos configuraveis:
 
 ```env
 WHATSAPP_JOBS_GROUP_1=
@@ -117,6 +117,8 @@ WHATSAPP_FACULTY_JOBS_GROUP=
 WHATSAPP_EVENTS_GROUP=
 WHATSAPP_NETWORKING_GROUP_1=
 WHATSAPP_NETWORKING_GROUP_2=
+WHATSAPP_EIXO_REPRESENTATIVES_GROUP=
+WHATSAPP_FACULTY_EVENTS_GROUP=
 ```
 
 `WHATSAPP_NETWORKING_GROUP` ainda existe como alias legado para o primeiro grupo de networking.
@@ -308,11 +310,14 @@ Hoje só as mensagens de entrada/saida de grupo (`src/networking/membership-list
 Os 2 grupos de Networking configurados tem automacoes reativas:
 
 - **Mencao**: se alguem mencionar o bot com `@` num desses grupos, ele responde com uma besteira e menciona a pessoa de volta — com limite (veja abaixo). Opcionalmente com IA de verdade (veja "Resposta de mencao com IA" abaixo).
-- **Entrada/saida**: quem entra num grupo de Networking recebe boas-vindas mencionando a pessoa ("seita secreta", ler as regras); quem sai leva uma mensagem iconica de despedida (HB20, Vasco, etc.), sem mencao.
+- **Entrada**: quem entra num grupo de Networking recebe boas-vindas mencionando a pessoa ("seita secreta", ler as regras).
+- **Saida**: a saida e apenas **registrada** (`group_membership_log`, usada no resumo diario), sem nenhuma mensagem no grupo.
+
+> Removido a pedido do usuario (2026-09-10): a mensagem iconica de despedida (HB20, Vasco, etc.) que era postada quando alguem saia do grupo. O registro do evento continua; a mensagem nao. Nao reintroduzir.
 
 > Removido a pedido do usuario (2026-09-07): o bot puxava assunto sozinho (piada, critica de linguagem, enquete, noticia via Dev.to, ou pergunta direta a um participante sorteado) sempre que um grupo ficava tempo demais sem mensagem. A feature (`NetworkingIdleService`, `NetworkingIdleScheduler`, integracao com a API do Dev.to) foi removida por completo, incluindo a tabela `networking_topic_history` (migration `0012`) — nao deixar essa ideia como flag desligada, foi uma remocao definitiva.
 
-Conteudo gerado por **templates com partes variaveis** (linguagem/framework/tema sorteados), sem IA generativa — decisao explicita para nao gastar token. `src/networking/idle-content.ts` guarda os moldes que restam (mencoes, boas-vindas, despedidas — o nome do arquivo é um resquicio historico da feature de ociosidade acima). `NetworkingRepository` (`group_activity`, `mention_reply_log`) guarda o estado de limite de mencoes e a contagem de mensagens/dia usada nas estatisticas.
+Conteudo gerado por **templates com partes variaveis** (linguagem/framework/tema sorteados), sem IA generativa — decisao explicita para nao gastar token. `src/networking/idle-content.ts` guarda os moldes que restam (mencoes, boas-vindas, aviso de lotacao — o nome do arquivo é um resquicio historico da feature de ociosidade acima). `NetworkingRepository` (`group_activity`, `mention_reply_log`) guarda o estado de limite de mencoes e a contagem de mensagens/dia usada nas estatisticas.
 
 ### Limite de mencoes
 
@@ -357,6 +362,112 @@ Novas tabelas: `group_membership_log` (historico de entrada/saida, registrado ma
 ```env
 NETWORKING_SCHEDULED_ENABLED=false
 ```
+
+## Aprovacao automatica de entrada
+
+Nos grupos de Networking, pedidos de entrada pendentes sao aprovados sozinhos quando o numero
+parece ser de uma pessoa real **e** ainda ha vaga no grupo (`JoinRequestService`,
+`src/networking/join-request.service.ts`). Exige que o bot seja **admin** do grupo — o WhatsApp
+recusa a aprovacao caso contrario, e o erro fica isolado por grupo.
+
+Duas entradas acionam a varredura: o evento `group.join-request` (imediato, enquanto o bot esta
+online) e um cron a cada `NETWORKING_JOIN_REQUEST_POLL_MINUTES` (`JoinRequestsScheduler`), que
+existe justamente pra pegar os pedidos que chegaram enquanto o bot estava fora do ar.
+
+**O bot nunca rejeita ninguem.** Numero reprovado na heuristica fica pendente pra um humano
+decidir. Nao trocar isso por rejeicao automatica: um falso positivo barraria uma pessoa real.
+
+A heuristica (`isLikelyRealPhoneNumber`, `src/shared/phone.ts`) e validacao de formato, nao
+deteccao de bot — **o WhatsApp nao expoe nenhum sinal de "isso e um bot"**. Ela checa E.164
+(8 a 15 digitos), codigo de pais **geografico** atribuido, e para `+55` o plano brasileiro inteiro
+(DDD alocado, celular de 9 digitos comecando em 9, fixo de 8 comecando em 2-5). Faixas nao
+geograficas (800 toll-free, 870/878 satelite, 881/882/883 redes globais, 888, 979) sao recusadas
+porque nunca sao linha pessoal. Um LID que nao pode ser resolvido pro numero de telefone tambem
+fica pendente, porque nao ha o que validar.
+
+Quando o grupo bate o teto e ainda ha gente na fila, o bot avisa no grupo que quem sair perde a
+vaga (`buildWaitlistNoticeMessage`), no maximo uma vez a cada
+`NETWORKING_WAITLIST_NOTICE_COOLDOWN_HOURS` por grupo. Esse aviso **respeita o silencio noturno**
+(diferente das boas-vindas): e recorrente, dispara toda varredura enquanto o grupo seguir lotado.
+
+```env
+NETWORKING_AUTO_APPROVE_ENABLED=false
+NETWORKING_GROUP_CAPACITY=1024
+NETWORKING_JOIN_REQUEST_POLL_MINUTES=15
+NETWORKING_WAITLIST_NOTICE_COOLDOWN_HOURS=24
+```
+
+## Faculdade: repasse de eventos
+
+Le o grupo "Representantes de eixo" (onde as professoras divulgam eventos) e posta um resumo no
+grupo "Eventos e oportunidades" da comunidade da faculdade. O bot **so le** o grupo de origem —
+nunca escreve nele.
+
+Filtro: **apenas mensagens de admins** do grupo de origem (`createAdminChecker`,
+`src/faculty/faculty-relay-listener.ts`), que sao as professoras e os representantes. Conversa de
+aluno no meio nao e repassada. A lista de admins fica em cache por 10 minutos pra nao pedir
+metadata do grupo a cada mensagem. Se a leitura da membership falhar, o bot fica **em silencio** —
+repassar tudo seria pior que nao repassar nada.
+
+Um aviso costuma vir picotado em varias mensagens ("evento tal", "dia X", "link aqui"), entao o
+servico faz **debounce**: cada mensagem nova empurra o prazo, e so depois de
+`FACULTY_RELAY_DEBOUNCE_MINUTES` de silencio o lote inteiro vira um resumo so
+(`FacultyRelayService`, `src/faculty/faculty-relay.service.ts`).
+
+O resumo usa a mesma Groq das respostas de mencao, com `temperature` bem mais baixa (0.2) — aqui
+criatividade significa data inventada. O prompt exige preservar nome, data, horario, local, link e
+prazo, e proibe preencher dado ausente com suposicao. **Se a IA falhar, o bot repassa as mensagens
+originais** em vez de perder o aviso. Captions de imagem sao lidas (`extractMessageText`,
+`src/shared/messages.ts`), porque divulgacao de evento quase sempre vem como flyer com os detalhes
+na legenda.
+
+```env
+FACULTY_RELAY_ENABLED=false
+WHATSAPP_EIXO_REPRESENTATIVES_GROUP=
+WHATSAPP_FACULTY_EVENTS_GROUP=
+FACULTY_RELAY_DEBOUNCE_MINUTES=5
+```
+
+## Aviso de atualizacao
+
+Toda atualizacao entra no `CHANGELOG.md` na raiz (formato Keep a Changelog). No boot, se a versao
+do `package.json` for diferente da ultima ja anunciada, o bot posta versao + os itens daquela
+entrada em **todos os grupos configurados** (`ReleaseAnnouncerService`,
+`src/release/release-announcer.service.ts`).
+
+A ultima versao anunciada fica no Postgres (`app_metadata`, chave `last_announced_version`), nao em
+memoria — o bot reinicia a cada deploy, e anunciar de novo a cada restart e exatamente a falha a
+evitar. A versao so e gravada **depois** que todas as mensagens foram enfileiradas, entao uma falha
+no meio refaz o lote no proximo boot em vez de pular grupos silenciosamente.
+
+Escreva as entradas do changelog pensando em **quem vai ler no WhatsApp**: frase curta, sem jargao,
+sem nome de arquivo. Versao sem entrada no changelog nao e anunciada, mas e gravada assim mesmo,
+senao a proxima entrada de verdade correria o risco de sair duas vezes.
+
+O `CHANGELOG.md` precisa estar dentro da imagem: o `Dockerfile` copia ele no estagio `runner`.
+
+```env
+RELEASE_ANNOUNCEMENTS_ENABLED=false
+```
+
+## Apresentacao em grupo novo
+
+Quando o bot e adicionado a um grupo, ele se apresenta (`createGroupIntroductionListener`,
+`src/networking/group-introduction-listener.ts`). Sao duas mensagens diferentes:
+
+- **Grupo ja configurado** (qualquer JID das variaveis da secao "Grupos"): saudacao curta — todo
+  mundo ali ja sabe o que e a FullDev, repetir o discurso seria ruido.
+- **Qualquer outro grupo**: apresentacao completa, dele e da comunidade FullDev. Aqui o bot e
+  convidado, entao dizer de onde vem e o ponto todo.
+
+Ele reconhece a si mesmo tanto pelo JID de telefone quanto pelo LID, e guarda em memoria os grupos
+onde ja se apresentou — uma reconexao pode reenviar o mesmo evento, e repetir a apresentacao no
+grupo dos outros pegaria mal.
+
+```env
+GROUP_INTRODUCTION_ENABLED=false
+```
+
 
 ## Estatisticas
 
@@ -462,8 +573,10 @@ src/
   jobs/
     providers/
     cli/
+  faculty/
   networking/
   queue/
+  release/
   scheduler/
   stats/
   whatsapp/

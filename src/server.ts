@@ -1,21 +1,28 @@
-import type { WAMessage } from "@whiskeysockets/baileys";
+import type { BaileysEventMap, WAMessage } from "@whiskeysockets/baileys";
 import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
 import { closeDatabase } from "./database/client.js";
 import { runMigrations } from "./database/migrate.js";
 import { createEventQnaListener } from "./events/event-qna-listener.js";
+import { createFacultyRelayListener } from "./faculty/faculty-relay-listener.js";
 import { createJobQnaListener } from "./jobs/job-qna-listener.js";
+import { createGroupIntroductionListener } from "./networking/group-introduction-listener.js";
+import { createJoinRequestListener } from "./networking/join-request-listener.js";
 import { createNetworkingMembershipListener } from "./networking/membership-listener.js";
 import { createNetworkingMessageListener } from "./networking/message-listener.js";
 import { queueWorker } from "./queue/queue.worker.js";
+import { releaseAnnouncerService } from "./release/release-announcer.service.js";
 import { eventCleanupScheduler } from "./scheduler/event-cleanup.scheduler.js";
 import { eventPromoScheduler } from "./scheduler/event-promo.scheduler.js";
 import { eventRemindersScheduler } from "./scheduler/event-reminders.scheduler.js";
 import { eventsScheduler } from "./scheduler/events.scheduler.js";
 import { jobsScheduler } from "./scheduler/jobs.scheduler.js";
+import { joinRequestsScheduler } from "./scheduler/join-requests.scheduler.js";
 import { networkingScheduledScheduler } from "./scheduler/networking-scheduled.scheduler.js";
 import { logger } from "./shared/logger.js";
 import { whatsapp } from "./whatsapp/client.js";
+
+type GroupParticipantsUpdate = BaileysEventMap["group-participants.update"];
 
 const app = buildApp({
   getWhatsAppStatus: () => whatsapp.getStatus(),
@@ -31,6 +38,8 @@ async function start(): Promise<void> {
     // incoming messages gets composed into a single dispatcher here - each one already filters by
     // its own configured group(s), so calling all of them per message is safe.
     const messageHandlers: Array<(message: WAMessage) => void | Promise<void>> = [];
+    // Same one-slot constraint as the message handler, so participant updates get composed too.
+    const participantHandlers: Array<(update: GroupParticipantsUpdate) => void | Promise<void>> = [];
     const getBotJids = (): string[] => {
       const user = whatsapp.getSocket()?.user;
       return [user?.id, user?.lid].filter((jid): jid is string => Boolean(jid));
@@ -41,7 +50,23 @@ async function start(): Promise<void> {
     // networking feature is enabled.
     if (env.NETWORKING_SCHEDULED_ENABLED) {
       messageHandlers.push(createNetworkingMessageListener({ getBotJids }));
-      whatsapp.setGroupParticipantsHandler(createNetworkingMembershipListener());
+      participantHandlers.push(createNetworkingMembershipListener());
+    }
+
+    // Independent of NETWORKING_SCHEDULED_ENABLED on purpose: approving pending members is a
+    // moderation duty, not part of the scheduled-content feature.
+    if (env.NETWORKING_AUTO_APPROVE_ENABLED) {
+      whatsapp.setGroupJoinRequestHandler(createJoinRequestListener());
+    }
+
+    // Not tied to any group list: the whole point is greeting groups the bot was just added to,
+    // including ones nobody configured.
+    if (env.GROUP_INTRODUCTION_ENABLED) {
+      participantHandlers.push(createGroupIntroductionListener({ getBotJids }));
+    }
+
+    if (env.FACULTY_RELAY_ENABLED) {
+      messageHandlers.push(createFacultyRelayListener());
     }
 
     if (env.EVENTS_POLL_ENABLED) {
@@ -50,6 +75,14 @@ async function start(): Promise<void> {
 
     if (env.JOBS_POLL_ENABLED) {
       messageHandlers.push(createJobQnaListener({ getBotJids }));
+    }
+
+    if (participantHandlers.length > 0) {
+      whatsapp.setGroupParticipantsHandler(async (update) => {
+        for (const handler of participantHandlers) {
+          await handler(update);
+        }
+      });
     }
 
     if (messageHandlers.length > 0) {
@@ -79,6 +112,12 @@ async function start(): Promise<void> {
       logger.info("Networking scheduled scheduler disabled");
     }
 
+    if (env.NETWORKING_AUTO_APPROVE_ENABLED) {
+      joinRequestsScheduler.start();
+    } else {
+      logger.info("Join requests scheduler disabled");
+    }
+
     if (env.EVENTS_POLL_ENABLED) {
       eventsScheduler.start();
       eventRemindersScheduler.start();
@@ -86,6 +125,14 @@ async function start(): Promise<void> {
       eventCleanupScheduler.start();
     } else {
       logger.info("Events scheduler disabled");
+    }
+
+    if (env.RELEASE_ANNOUNCEMENTS_ENABLED) {
+      // Queued, not sent: the worker delivers it once WhatsApp is connected, so this never
+      // blocks or fails the boot.
+      await releaseAnnouncerService.announceIfNeeded().catch((error: unknown) => {
+        logger.error({ err: error }, "Release announcement failed");
+      });
     }
 
     await app.listen({ host: env.HOST, port: env.PORT });
@@ -100,6 +147,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   logger.info({ signal }, "Shutting down");
   jobsScheduler.stop();
   networkingScheduledScheduler.stop();
+  joinRequestsScheduler.stop();
   eventsScheduler.stop();
   eventRemindersScheduler.stop();
   eventPromoScheduler.stop();

@@ -95,7 +95,29 @@ const envSchema = z.object({
   MENTION_REPLY_AI_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
   GROQ_API_KEY: z.string().optional().default(""),
   GROQ_MODEL: z.string().min(1).default("openai/gpt-oss-20b"),
-  NETWORKING_SCHEDULED_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false)
+  NETWORKING_SCHEDULED_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  // Auto-approving pending join requests acts on the group without a human in the loop, and it
+  // needs the bot to be a group admin, so it stays opt-in like every other side-effecting feature.
+  NETWORKING_AUTO_APPROVE_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  // WhatsApp's own hard ceiling for group members.
+  NETWORKING_GROUP_CAPACITY: z.coerce.number().int().positive().max(1024).default(1024),
+  // The join-request event catches requests that arrive while the bot is online; this sweep is
+  // what picks up the ones that piled up while it was down.
+  NETWORKING_JOIN_REQUEST_POLL_MINUTES: z.coerce.number().int().positive().default(15),
+  NETWORKING_WAITLIST_NOTICE_COOLDOWN_HOURS: z.coerce.number().int().positive().default(24),
+  // Faculty relay: reads the course-representatives group and forwards a summary of what the
+  // professors announce to the college community's events group.
+  WHATSAPP_EIXO_REPRESENTATIVES_GROUP: z.string().optional().default(""),
+  WHATSAPP_FACULTY_EVENTS_GROUP: z.string().optional().default(""),
+  FACULTY_RELAY_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  // How long to wait after the last message before summarizing, so an announcement split across
+  // several messages is relayed as one summary instead of being chopped up.
+  FACULTY_RELAY_DEBOUNCE_MINUTES: z.coerce.number().int().positive().default(5),
+  // Announces the current version plus its changelog entry once, the first time the bot boots on
+  // a version it has not announced yet.
+  RELEASE_ANNOUNCEMENTS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  // Greets the group when the bot is added to it.
+  GROUP_INTRODUCTION_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false)
 });
 
 export type Env = z.infer<typeof envSchema>;

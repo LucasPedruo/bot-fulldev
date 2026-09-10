@@ -34,6 +34,7 @@ export class WhatsAppConnectionManager {
   private stopping = false;
   private messageHandler?: (message: WAMessage) => void | Promise<void>;
   private groupParticipantsHandler?: (update: BaileysEventMap["group-participants.update"]) => void | Promise<void>;
+  private groupJoinRequestHandler?: (update: BaileysEventMap["group.join-request"]) => void | Promise<void>;
   private readonly authDir: string;
   private readonly log: Logger;
 
@@ -56,6 +57,10 @@ export class WhatsAppConnectionManager {
 
   setGroupParticipantsHandler(handler: (update: BaileysEventMap["group-participants.update"]) => void | Promise<void>): void {
     this.groupParticipantsHandler = handler;
+  }
+
+  setGroupJoinRequestHandler(handler: (update: BaileysEventMap["group.join-request"]) => void | Promise<void>): void {
+    this.groupJoinRequestHandler = handler;
   }
 
   async start(): Promise<void> {
@@ -93,6 +98,9 @@ export class WhatsAppConnectionManager {
     });
     this.socket.ev.on("group-participants.update", (update) => {
       this.invokeHandler(this.groupParticipantsHandler, update, "Group participants handler failed");
+    });
+    this.socket.ev.on("group.join-request", (update) => {
+      this.invokeHandler(this.groupJoinRequestHandler, update, "Group join request handler failed");
     });
     this.socket.ev.on("connection.update", (update) => {
       const { connection, lastDisconnect, qr } = update;
