@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { EnqueueMessageInput, QueueMessage, TextMessagePayload } from "../queue/queue.types.js";
-import { JoinRequestService, type JoinRequestSocketLike, type QueueServiceLike } from "./join-request.service.js";
+import {
+  isForbiddenError,
+  JoinRequestService,
+  type JoinRequestSocketLike,
+  type QueueServiceLike
+} from "./join-request.service.js";
 
 const groupJid = "120363000000000001@g.us";
 
@@ -268,5 +273,45 @@ void test("processAllGroups keeps going when one group fails", async () => {
 
   assert.equal(results.length, 1);
   assert.equal(results[0].groupJid, otherGroup);
+  assert.deepEqual(results[0].approved, ["5511987654321@s.whatsapp.net"]);
+});
+
+void test("recognizes WhatsApp's refusal when the bot is not an admin", () => {
+  // Baileys surfaces it as a Boom error with data:403 and message "forbidden".
+  assert.equal(isForbiddenError({ data: 403, message: "forbidden" }), true);
+  assert.equal(isForbiddenError({ data: 403 }), true);
+  assert.equal(isForbiddenError(new Error("forbidden")), true);
+  assert.equal(isForbiddenError(new Error("timeout")), false);
+  assert.equal(isForbiddenError({ data: 500 }), false);
+  assert.equal(isForbiddenError(undefined), false);
+  assert.equal(isForbiddenError(null), false);
+});
+
+void test("a group the bot is not admin of does not stop the other groups", async () => {
+  const otherGroup = "120363000000000002@g.us";
+  const queue = new FakeQueue();
+  const forbidden = Object.assign(new Error("forbidden"), { data: 403 });
+  const service = new JoinRequestService({
+    networkingGroups: [groupJid, otherGroup],
+    groupCapacity: 1024,
+    queue,
+    resolveJid: async (jid: string) => Promise.resolve(jid),
+    getSocket: () => ({
+      groupMetadata: async () => Promise.resolve({ participants: new Array<unknown>(10).fill({}) }),
+      groupRequestParticipantsList: async (jid: string) => {
+        await Promise.resolve();
+        if (jid === groupJid) {
+          throw forbidden;
+        }
+        return [{ jid: "5511987654321@s.whatsapp.net" }];
+      },
+      groupRequestParticipantsUpdate: async (_j: string, participants: string[]) =>
+        Promise.resolve(participants.map((participant) => ({ status: "200", jid: participant })))
+    })
+  });
+
+  const results = await service.processAllGroups();
+
+  assert.equal(results.length, 1);
   assert.deepEqual(results[0].approved, ["5511987654321@s.whatsapp.net"]);
 });

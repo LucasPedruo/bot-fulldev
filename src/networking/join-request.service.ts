@@ -63,6 +63,18 @@ export class JoinRequestService {
       try {
         results.push(await this.processGroup(groupJid));
       } catch (error) {
+        // Not being an admin is a configuration state, not a fault: WhatsApp answers 403 to the
+        // pending-requests query and there is nothing the bot can do about it. Logging it as an
+        // error with a full stack every sweep buries real failures in noise, so it gets a short,
+        // actionable warning instead.
+        if (isForbiddenError(error)) {
+          logger.warn(
+            { groupJid },
+            "Cannot read join requests - the bot must be an admin of this group for auto-approval to work"
+          );
+          continue;
+        }
+
         logger.error({ err: error, groupJid }, "Failed to process group join requests");
       }
     }
@@ -187,6 +199,17 @@ export class JoinRequestService {
     logger.info({ groupJid, pendingCount }, "Waiting-list notice queued");
     return true;
   }
+}
+
+// Baileys wraps the server's refusal in a Boom error carrying the numeric status in `data`, and
+// the message is the raw "forbidden" the server sent back.
+export function isForbiddenError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const candidate = error as { data?: unknown; message?: unknown };
+  return candidate.data === 403 || candidate.message === "forbidden";
 }
 
 function defaultGetSocket(): JoinRequestSocketLike | undefined {
