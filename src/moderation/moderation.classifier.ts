@@ -8,7 +8,7 @@ import { logger } from "../shared/logger.js";
 //
 // So the prompt is deliberately biased towards allowing, and every failure path (no key, timeout,
 // bad response, unparseable answer) resolves to "allowed" rather than to a deletion.
-const systemPrompt = [
+const jobsSystemPrompt = [
   "Você modera um grupo de WhatsApp cujo único propósito é a divulgação de vagas de emprego em",
   "tecnologia. Você recebe uma mensagem e decide se ela pertence ao grupo.",
   "",
@@ -27,6 +27,31 @@ const systemPrompt = [
   "REGRA DECISIVA: na dúvida, responda allow. É muito pior apagar uma vaga de verdade do que",
   "deixar passar uma conversa. Só responda remove quando estiver claro que a mensagem não tem",
   "nenhuma relação com vagas.",
+  "",
+  'Responda APENAS com um JSON: {"decision":"allow"|"remove","reason":"<motivo curto>"}'
+].join("\n");
+
+const networkingSystemPrompt = [
+  "Voce modera um grupo de WhatsApp da comunidade FullDev para networking profissional em tecnologia.",
+  "Voce recebe uma mensagem e decide se ela pertence ao grupo.",
+  "",
+  "PERMITIDO (responda allow):",
+  "- Discussoes de tecnologia, engenharia de software, ferramentas, arquitetura, dados, IA e seguranca.",
+  "- Duvidas tecnicas, ajuda com codigo, estudo, projeto, carreira, portfolio, entrevistas e mercado tech.",
+  "- Debates gerais de tecnologia, crescimento profissional, colaboracao e feedback construtivo.",
+  "- Combinados do projeto, prazos, ajuda para cumprir tarefas e alinhamentos tecnicos.",
+  "",
+  "NAO PERMITIDO (responda remove):",
+  "- Assuntos fora de tecnologia/carreira/projeto. Esses temas devem ser direcionados ao grupo Off Topic.",
+  "- Politica, candidatos, partidos, guerra cultural, propaganda partidaria ou discussao religiosa.",
+  "- Discriminacao ou ataque por cor da pele, etnia, religiao, orientacao sexual, genero ou identidade.",
+  "- Ofensas, humilhacao, xingamento, provocacao agressiva, assedio ou conflito sem respeito.",
+  "- Linguagem claramente inadequada para um ambiente profissional.",
+  "- Conteudo sensivel, violento, sexual, chocante ou links/material de pirataria.",
+  "- Spam, golpe, corrente, divulgacao aleatoria ou figurinha/meme politico.",
+  "",
+  "REGRA DECISIVA: na duvida, responda allow. E pior apagar uma duvida tecnica real ou conversa",
+  "de carreira do que deixar passar algo leve. So responda remove quando a violacao estiver clara.",
   "",
   'Responda APENAS com um JSON: {"decision":"allow"|"remove","reason":"<motivo curto>"}'
 ].join("\n");
@@ -55,6 +80,21 @@ export function buildClassificationPrompt(text: string, imageDescription?: strin
 }
 
 export async function classifyJobsGroupMessage(
+  text: string,
+  imageDescription?: string
+): Promise<ModerationDecision> {
+  return classifyWithPrompt(jobsSystemPrompt, text, imageDescription);
+}
+
+export async function classifyNetworkingGroupMessage(
+  text: string,
+  imageDescription?: string
+): Promise<ModerationDecision> {
+  return classifyWithPrompt(networkingSystemPrompt, text, imageDescription);
+}
+
+async function classifyWithPrompt(
+  systemPrompt: string,
   text: string,
   imageDescription?: string
 ): Promise<ModerationDecision> {

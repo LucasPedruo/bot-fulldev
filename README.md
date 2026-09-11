@@ -529,6 +529,34 @@ JOBS_MODERATION_STRIKE_LIMIT=3
 JOBS_MODERATION_BLOCK_DAYS=14
 ```
 
+## Moderacao dos grupos de networking
+
+Os grupos de networking permitem discussoes de tecnologia, duvidas tecnicas, carreira, debates
+gerais de tecnologia, colaboracao, ajuda e alinhamentos de projeto. Assuntos fora disso devem ser
+levados para o grupo Off Topic.
+
+A moderacao usa o mesmo mecanismo dos grupos de vagas: mensagem removida, ponto na **malha fina**
+e remocao/bloqueio ao atingir o limite. A diferenca esta no classificador e nas mensagens de aviso
+(`createNetworkingModerationListener`, `src/moderation/moderation-listener.ts`).
+
+Nao e permitido no networking:
+
+- Politica, candidatos, questoes partidarias ou religiao.
+- Discriminacao por cor da pele, etnia, religiao, orientacao sexual, genero etc.
+- Ofensas, linguagem agressiva, assedio ou conflitos tratados sem respeito.
+- Conteudo sensivel, links/material de pirataria, spam, golpes ou correntes.
+- Figurinhas ou conteudo politico.
+
+Admins do grupo continuam isentos e, como em Vagas, o bot precisa ser **admin** para apagar
+mensagens e remover membros. O classificador tambem permite em caso de duvida ou falha da IA, para
+evitar apagar uma duvida tecnica ou conversa de carreira legitima.
+
+```env
+NETWORKING_MODERATION_ENABLED=false
+NETWORKING_MODERATION_STRIKE_LIMIT=3
+NETWORKING_MODERATION_BLOCK_DAYS=14
+```
+
 ## Acessibilidade: descricao de imagens
 
 Toda imagem e figurinha postada em qualquer grupo vira uma descricao em texto, para que quem usa

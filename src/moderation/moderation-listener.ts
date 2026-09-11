@@ -7,10 +7,11 @@ import { downloadMedia } from "../shared/media.js";
 import { extractMessageText } from "../shared/messages.js";
 import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
-import { classifyJobsGroupMessage } from "./moderation.classifier.js";
+import { classifyJobsGroupMessage, classifyNetworkingGroupMessage } from "./moderation.classifier.js";
 import { moderationService, type ModerationActions, type ModerationService } from "./moderation.service.js";
 
 export type ModerationListenerOptions = {
+  groups?: string[];
   jobsGroups?: string[];
   service?: Pick<ModerationService, "punish">;
   classify?: (text: string, imageDescription?: string) => Promise<{ allowed: boolean; reason: string }>;
@@ -23,8 +24,32 @@ export function getModeratedJobsGroups(): string[] {
   return [groups.jobsGroup1, groups.jobsGroup2, groups.facultyJobsGroup].filter((jid) => jid.length > 0);
 }
 
+export function getModeratedNetworkingGroups(): string[] {
+  return getConfiguredWhatsAppGroups().networkingGroups;
+}
+
 export function createJobsModerationListener(
   options: ModerationListenerOptions = {}
+): (message: WAMessage) => Promise<void> {
+  return createGroupModerationListener({
+    ...options,
+    groups: options.groups ?? options.jobsGroups ?? getModeratedJobsGroups(),
+    classify: options.classify ?? classifyJobsGroupMessage
+  });
+}
+
+export function createNetworkingModerationListener(
+  options: ModerationListenerOptions = {}
+): (message: WAMessage) => Promise<void> {
+  return createGroupModerationListener({
+    ...options,
+    groups: options.groups ?? getModeratedNetworkingGroups(),
+    classify: options.classify ?? classifyNetworkingGroupMessage
+  });
+}
+
+function createGroupModerationListener(
+  options: ModerationListenerOptions
 ): (message: WAMessage) => Promise<void> {
   const service = options.service ?? moderationService;
   const classify = options.classify ?? classifyJobsGroupMessage;
@@ -33,9 +58,9 @@ export function createJobsModerationListener(
 
   return async function handleIncomingMessage(message: WAMessage): Promise<void> {
     const groupJid = message.key?.remoteJid;
-    const jobsGroups = options.jobsGroups ?? getModeratedJobsGroups();
+    const groups = options.groups ?? getModeratedJobsGroups();
 
-    if (!groupJid || !jobsGroups.includes(groupJid) || message.key.fromMe) {
+    if (!groupJid || !groups.includes(groupJid) || message.key.fromMe) {
       return;
     }
 

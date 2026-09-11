@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { WAMessage } from "@whiskeysockets/baileys";
-import { createJobsModerationListener } from "./moderation-listener.js";
+import { createJobsModerationListener, createNetworkingModerationListener } from "./moderation-listener.js";
 import type { StrikeOutcome } from "./moderation.service.js";
 
 const jobsGroup = "120363391901542507@g.us";
+const networkingGroup = "120363000000000001@g.us";
 const member = "5511987654321@s.whatsapp.net";
 const admin = "5521999998888@s.whatsapp.net";
 
@@ -197,6 +198,38 @@ void test("keeps an image it could not describe instead of deleting blind", asyn
   await buildListener(service, { describeMedia: async () => Promise.resolve(undefined) })(
     buildMessage({ image: true })
   );
+
+  assert.deepEqual(service.punished, []);
+});
+
+void test("moderates the configured networking groups", async () => {
+  const service = new FakeService();
+  const listener = createNetworkingModerationListener({
+    groups: [networkingGroup],
+    service,
+    isGroupAdmin: neverAdmin,
+    describeMedia: noMedia,
+    classify: async () => Promise.resolve({ allowed: false, reason: "politica" })
+  });
+
+  await listener(buildMessage({ remoteJid: networkingGroup, text: "votem no candidato X" }));
+
+  assert.equal(service.punished.length, 1);
+  assert.equal(service.punished[0].groupJid, networkingGroup);
+  assert.equal(service.punished[0].reason, "politica");
+});
+
+void test("networking moderation ignores non-networking groups", async () => {
+  const service = new FakeService();
+  const listener = createNetworkingModerationListener({
+    groups: [networkingGroup],
+    service,
+    isGroupAdmin: neverAdmin,
+    describeMedia: noMedia,
+    classify: async () => Promise.resolve({ allowed: false, reason: "off-topic" })
+  });
+
+  await listener(buildMessage({ remoteJid: jobsGroup, text: "bom dia" }));
 
   assert.deepEqual(service.punished, []);
 });

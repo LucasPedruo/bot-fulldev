@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { WAMessageKey } from "@whiskeysockets/baileys";
 import type { EnqueueMessageInput, QueueMessage, TextMessagePayload } from "../queue/queue.types.js";
-import { ModerationService, type ModerationActions, type QueueServiceLike } from "./moderation.service.js";
+import {
+  buildNetworkingRemovalMessage,
+  buildNetworkingWarningMessage,
+  ModerationService,
+  type ModerationActions,
+  type QueueServiceLike
+} from "./moderation.service.js";
 
 const groupJid = "120363391901542507@g.us";
 const participantJid = "5511987654321@s.whatsapp.net";
@@ -188,4 +194,35 @@ void test("honours a different strike limit", async () => {
 
   assert.equal(outcome.removed, true);
   assert.deepEqual(actions.removed, [participantJid]);
+});
+
+void test("networking warnings direct off-topic subjects to Off Topic", async () => {
+  const queue = new FakeQueue();
+
+  await punish(
+    buildService(queue, new FakeRepository(), new FakeActions(), {
+      warningMessage: buildNetworkingWarningMessage,
+      removalMessage: buildNetworkingRemovalMessage
+    })
+  );
+
+  const text = (queue.enqueued[0].payload as TextMessagePayload).text;
+  assert.match(text, /tecnologia/i);
+  assert.match(text, /Off Topic/);
+  assert.match(text, /pirataria/i);
+});
+
+void test("networking removal message describes the networking scope", async () => {
+  const queue = new FakeQueue();
+
+  await punish(
+    buildService(queue, new FakeRepository(2), new FakeActions(), {
+      warningMessage: buildNetworkingWarningMessage,
+      removalMessage: buildNetworkingRemovalMessage
+    })
+  );
+
+  const text = (queue.enqueued[0].payload as TextMessagePayload).text;
+  assert.match(text, /discussoes de tecnologia/i);
+  assert.match(text, /carreira/i);
 });

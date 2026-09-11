@@ -7,6 +7,13 @@ WhatsApp**: frases curtas, sem jargão interno, sem nome de arquivo.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o versionamento é
 [semântico](https://semver.org/lang/pt-BR/).
 
+## [0.4.3] - 2026-09-11
+
+### Adicionado
+
+- Moderacao nos grupos de networking: politica, religiao, ofensas, discriminacao, conteudo sensivel
+  e pirataria agora entram na malha fina. Conversas fora de tecnologia/carreira devem ir para o Off Topic.
+
 ## [0.4.2] - 2026-09-10
 
 ### Alterado

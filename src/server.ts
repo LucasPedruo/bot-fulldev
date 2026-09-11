@@ -7,8 +7,16 @@ import { runMigrations } from "./database/migrate.js";
 import { createEventQnaListener } from "./events/event-qna-listener.js";
 import { createFacultyRelayListener } from "./faculty/faculty-relay-listener.js";
 import { createJobQnaListener } from "./jobs/job-qna-listener.js";
-import { createJobsModerationListener, createWhatsAppModerationActions } from "./moderation/moderation-listener.js";
-import { ModerationService } from "./moderation/moderation.service.js";
+import {
+  createJobsModerationListener,
+  createNetworkingModerationListener,
+  createWhatsAppModerationActions
+} from "./moderation/moderation-listener.js";
+import {
+  buildNetworkingRemovalMessage,
+  buildNetworkingWarningMessage,
+  ModerationService
+} from "./moderation/moderation.service.js";
 import { createGroupIntroductionListener } from "./networking/group-introduction-listener.js";
 import { introductionBackfillService } from "./networking/introduction-backfill.service.js";
 import { createJoinRequestListener } from "./networking/join-request-listener.js";
@@ -83,6 +91,17 @@ async function start(): Promise<void> {
     if (env.JOBS_MODERATION_ENABLED) {
       const moderation = new ModerationService({ actions: createWhatsAppModerationActions() });
       messageHandlers.push(createJobsModerationListener({ service: moderation }));
+    }
+
+    if (env.NETWORKING_MODERATION_ENABLED) {
+      const moderation = new ModerationService({
+        actions: createWhatsAppModerationActions(),
+        strikeLimit: env.NETWORKING_MODERATION_STRIKE_LIMIT,
+        blockDays: env.NETWORKING_MODERATION_BLOCK_DAYS,
+        warningMessage: buildNetworkingWarningMessage,
+        removalMessage: buildNetworkingRemovalMessage
+      });
+      messageHandlers.push(createNetworkingModerationListener({ service: moderation }));
     }
 
     if (env.EVENTS_POLL_ENABLED) {

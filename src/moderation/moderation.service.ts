@@ -22,6 +22,8 @@ export type ModerationServiceOptions = {
   queue?: QueueServiceLike;
   repository?: Pick<ModerationRepository, "addStrike" | "resetStrikes" | "block">;
   actions?: ModerationActions;
+  warningMessage?: (tag: string, strikes: number, limit: number) => string;
+  removalMessage?: (tag: string, limit: number, blockDays: number) => string;
   now?: () => Date;
 };
 
@@ -48,6 +50,8 @@ export class ModerationService {
     const queue = this.options.queue ?? queueService;
     const limit = this.options.strikeLimit ?? env.JOBS_MODERATION_STRIKE_LIMIT;
     const blockDays = this.options.blockDays ?? env.JOBS_MODERATION_BLOCK_DAYS;
+    const warningMessage = this.options.warningMessage ?? buildWarningMessage;
+    const removalMessage = this.options.removalMessage ?? buildRemovalMessage;
     const now = (this.options.now ?? (() => new Date()))();
 
     if (actions) {
@@ -63,7 +67,7 @@ export class ModerationService {
         type: "networking",
         destinationGroup: input.groupJid,
         payload: {
-          text: buildWarningMessage(tag, strikes, limit),
+          text: warningMessage(tag, strikes, limit),
           mentions: [input.participantJid]
         },
         // The warning has to arrive while the person still remembers what they posted, and it
@@ -83,7 +87,7 @@ export class ModerationService {
       type: "networking",
       destinationGroup: input.groupJid,
       payload: {
-        text: buildRemovalMessage(tag, limit, blockDays),
+        text: removalMessage(tag, limit, blockDays),
         mentions: [input.participantJid]
       },
       bypassQuietHours: true
@@ -127,6 +131,29 @@ export function buildRemovalMessage(tag: string, limit: number, blockDays: numbe
     `Poderá voltar a entrar daqui a ${blockDays} dias. Até lá, pedidos de entrada não serão aceitos.`,
     "",
     "Este grupo é exclusivo para divulgação de vagas."
+  ].join("\n");
+}
+
+export function buildNetworkingWarningMessage(tag: string, strikes: number, limit: number): string {
+  return [
+    `${tag} sua mensagem foi removida: este grupo e para tecnologia, duvidas tecnicas, carreira e debates gerais de tecnologia.`,
+    "",
+    `Malha fina: ${strikes}/${limit}.`,
+    "",
+    "Assuntos fora desses temas devem ir para o grupo Off Topic. Politica, religiao, ofensas,",
+    "conteudo sensivel e links de pirataria nao sao permitidos aqui.",
+    "",
+    `Ao chegar em ${limit}/${limit} voce e removido do grupo.`
+  ].join("\n");
+}
+
+export function buildNetworkingRemovalMessage(tag: string, limit: number, blockDays: number): string {
+  return [
+    `${tag} malha fina ${limit}/${limit}. Voce esta sendo removido do grupo.`,
+    "",
+    `Podera voltar a entrar daqui a ${blockDays} dias. Ate la, pedidos de entrada nao serao aceitos.`,
+    "",
+    "Este grupo e para discussoes de tecnologia, duvidas tecnicas, carreira e crescimento profissional."
   ].join("\n");
 }
 
