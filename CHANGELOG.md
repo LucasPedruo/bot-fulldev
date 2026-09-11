@@ -7,6 +7,13 @@ WhatsApp**: frases curtas, sem jargão interno, sem nome de arquivo.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o versionamento é
 [semântico](https://semver.org/lang/pt-BR/).
 
+## [0.4.4] - 2026-09-11
+
+### Alterado
+
+- Quackson ganhou mais personalidade: pato fullstack milenar, caseiro, madrugador, fã de anime,
+  MMORPG e Vasco, com medo de IA substituir devs e ranço de vibecoders.
+
 ## [0.4.3] - 2026-09-11
 
 ### Adicionado
