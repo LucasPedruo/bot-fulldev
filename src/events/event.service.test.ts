@@ -6,6 +6,8 @@ import { EventService, type EventRepositoryLike, type QueueServiceLike } from ".
 import type { EventNotificationType, NormalizedEvent, PersistedEvent } from "./event.types.js";
 import type { EventProvider } from "./providers/provider.interface.js";
 
+Object.assign(env, { WHATSAPP_EVENTS_GROUP: "120363429019612420@g.us" });
+
 const event: NormalizedEvent = {
   externalId: "2026-09-02-gophercon-latam-2026",
   source: "AgendaTechBrasil",
@@ -208,7 +210,7 @@ void test("sendReminders never resends a reminder type already recorded for an e
   assert.equal(queue.enqueued.length, 0);
 });
 
-void test("sendPromotions creates a native event, a poll and a native mention-all message for events 5 days out", async () => {
+void test("sendPromotions creates only a native event for events 5 days out", async () => {
   const persisted: PersistedEvent = { ...event, id: "event-1" };
   const repository = new FakeRepository(undefined, 0, [persisted]);
   const queue = new FakeQueue();
@@ -217,14 +219,12 @@ void test("sendPromotions creates a native event, a poll and a native mention-al
   const result = await service.sendPromotions();
 
   assert.equal(result.sent, 1);
-  assert.equal(queue.enqueued.length, 3);
+  assert.equal(queue.enqueued.length, 1);
   assert.deepEqual(repository.notifications, [{ eventId: "event-1", type: "event_promo" }]);
 
-  const [eventMessage, pollMessage, mentionMessage] = queue.enqueued;
+  const [eventMessage] = queue.enqueued;
   assert.equal(eventMessage.type, "event_promo");
   assert.ok("eventCreation" in eventMessage.payload && eventMessage.payload.eventCreation.name === event.title);
-  assert.ok("poll" in pollMessage.payload && pollMessage.payload.poll.name.includes(event.title));
-  assert.ok("text" in mentionMessage.payload && mentionMessage.payload.mentionAll === true);
 });
 
 void test("sendPromotions never resends the promo for an event already promoted", async () => {

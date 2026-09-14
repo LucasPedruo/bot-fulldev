@@ -6,6 +6,12 @@ import type { NormalizedJob, PersistedJob } from "./job.types.js";
 import type { JobProvider } from "./providers/provider.interface.js";
 import type { EnqueueMessageInput, QueueMessage } from "../queue/queue.types.js";
 
+Object.assign(env, {
+  WHATSAPP_JOBS_GROUP_1: "120363391901542507@g.us",
+  WHATSAPP_JOBS_GROUP_2: "120363417654610744@g.us",
+  WHATSAPP_FACULTY_JOBS_GROUP: "120363401995520356@g.us"
+});
+
 const job: NormalizedJob = {
   externalId: "job-1",
   source: "Jobicy",

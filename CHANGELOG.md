@@ -7,6 +7,13 @@ WhatsApp**: frases curtas, sem jargão interno, sem nome de arquivo.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o versionamento é
 [semântico](https://semver.org/lang/pt-BR/).
 
+## [0.4.5] - 2026-09-14
+
+### Removido
+
+- A malha fina foi removida dos grupos de vagas e oportunidades.
+- A promocao de eventos nao cria mais enquete e nao marca todo mundo no grupo.
+
 ## [0.4.4] - 2026-09-11
 
 ### Alterado

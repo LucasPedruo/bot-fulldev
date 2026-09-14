@@ -179,22 +179,15 @@ export class WhatsAppConnectionManager {
     const socket = this.requireConnectedSocket();
     const metadata = await socket.groupMetadata(groupJid);
     const rawIds = metadata.participants.map((participant) => participant.id);
-    // Resolved to phone-number JIDs here, once, so every caller (spotlight, idle direct-question,
-    // event-promo mention-all) gets IDs that actually render as real @mentions - a LID-based tag
-    // shows as unlinked plain text in WhatsApp clients instead.
+    // Resolved to phone-number JIDs here, once, so every caller gets IDs that actually render as
+    // real @mentions - a LID-based tag shows as unlinked plain text in WhatsApp clients instead.
     return resolvePhoneJids(rawIds, socket);
   }
 
-  async sendText(destinationJid: string, text: string, mentions: string[] = [], mentionAll = false): Promise<void> {
+  async sendText(destinationJid: string, text: string, mentions: string[] = []): Promise<void> {
     const socket = this.requireConnectedSocket();
-    await socket.sendMessage(destinationJid, { text, mentions, mentionAll });
-    this.log.info({ destinationJid, mentionsCount: mentions.length, mentionAll }, "WhatsApp text message sent");
-  }
-
-  async sendPoll(destinationJid: string, name: string, values: string[], selectableCount = 1): Promise<void> {
-    const socket = this.requireConnectedSocket();
-    await socket.sendMessage(destinationJid, { poll: { name, values, selectableCount } });
-    this.log.info({ destinationJid, optionsCount: values.length }, "WhatsApp poll sent");
+    await socket.sendMessage(destinationJid, { text, mentions });
+    this.log.info({ destinationJid, mentionsCount: mentions.length }, "WhatsApp text message sent");
   }
 
   async sendEvent(destinationJid: string, name: string, description: string | undefined, startDate: Date, endDate?: Date): Promise<void> {

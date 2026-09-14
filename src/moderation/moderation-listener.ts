@@ -7,35 +7,19 @@ import { downloadMedia } from "../shared/media.js";
 import { extractMessageText } from "../shared/messages.js";
 import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
-import { classifyJobsGroupMessage, classifyNetworkingGroupMessage } from "./moderation.classifier.js";
+import { classifyNetworkingGroupMessage } from "./moderation.classifier.js";
 import { moderationService, type ModerationActions, type ModerationService } from "./moderation.service.js";
 
 export type ModerationListenerOptions = {
   groups?: string[];
-  jobsGroups?: string[];
   service?: Pick<ModerationService, "punish">;
   classify?: (text: string, imageDescription?: string) => Promise<{ allowed: boolean; reason: string }>;
   isGroupAdmin?: (groupJid: string, senderJid: string) => Promise<boolean>;
   describeMedia?: (message: WAMessage) => Promise<string | undefined>;
 };
 
-export function getModeratedJobsGroups(): string[] {
-  const groups = getConfiguredWhatsAppGroups();
-  return [groups.jobsGroup1, groups.jobsGroup2, groups.facultyJobsGroup].filter((jid) => jid.length > 0);
-}
-
 export function getModeratedNetworkingGroups(): string[] {
   return getConfiguredWhatsAppGroups().networkingGroups;
-}
-
-export function createJobsModerationListener(
-  options: ModerationListenerOptions = {}
-): (message: WAMessage) => Promise<void> {
-  return createGroupModerationListener({
-    ...options,
-    groups: options.groups ?? options.jobsGroups ?? getModeratedJobsGroups(),
-    classify: options.classify ?? classifyJobsGroupMessage
-  });
 }
 
 export function createNetworkingModerationListener(
@@ -52,13 +36,13 @@ function createGroupModerationListener(
   options: ModerationListenerOptions
 ): (message: WAMessage) => Promise<void> {
   const service = options.service ?? moderationService;
-  const classify = options.classify ?? classifyJobsGroupMessage;
+  const classify = options.classify ?? classifyNetworkingGroupMessage;
   const isGroupAdmin = options.isGroupAdmin ?? createAdminChecker();
   const describeMedia = options.describeMedia ?? defaultDescribeMedia;
 
   return async function handleIncomingMessage(message: WAMessage): Promise<void> {
     const groupJid = message.key?.remoteJid;
-    const groups = options.groups ?? getModeratedJobsGroups();
+    const groups = options.groups ?? getModeratedNetworkingGroups();
 
     if (!groupJid || !groups.includes(groupJid) || message.key.fromMe) {
       return;
@@ -85,11 +69,9 @@ function createGroupModerationListener(
     const text = extractMessageText(message) ?? "";
     const media = findDescribableMedia(message);
 
-    // A sticker is never a job posting and never a request to filter vacancies, so it is
-    // off-topic by construction - no classifier needed. This is decided BEFORE any download,
-    // because the previous version asked for a description first and silently gave up when that
-    // failed: a sticker slipped through the jobs group in production exactly that way, since the
-    // media host in its proto no longer resolves and the vision model rejects animated WebP.
+    // Stickers are not part of the networking rules, so they are off-topic by construction. This
+    // is decided before any download because expired media should not make a forbidden sticker
+    // silently slip through.
     if (media?.isSticker) {
       await service.punish({
         groupJid,
@@ -100,14 +82,13 @@ function createGroupModerationListener(
       return;
     }
 
-    // A job posted as a flyer carries no text. Judging it on the text alone would delete a valid
-    // posting for being empty, so the image is described first and fed to the classifier.
+    // A useful image can carry the actual content with no text. Judging it on text alone would
+    // delete it for being empty, so the image is described first and fed to the classifier.
     const imageDescription = await describeMedia(message);
 
     if (text.trim().length === 0) {
-      // An image we could not describe is genuinely unjudgeable, and it could well be a flyer
-      // with a real vacancy. Deleting on a failed download would be punishing someone for our
-      // own outage, so it stays - logged, so the gap is visible rather than silent.
+      // An image we could not describe is genuinely unjudgeable. Deleting on a failed download
+      // would be punishing someone for our own outage, so it stays - logged, so the gap is visible.
       if (!imageDescription) {
         if (media) {
           logger.warn({ groupJid }, "Could not describe the image - leaving it in place rather than deleting blind");

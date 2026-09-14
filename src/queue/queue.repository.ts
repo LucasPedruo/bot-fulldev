@@ -6,16 +6,7 @@ import type { EnqueueMessageInput, MessagePayload, MessageQueueType, QueueMessag
 
 const textMessagePayloadSchema = z.object({
   text: z.string().min(1),
-  mentions: z.array(z.string()).optional(),
-  mentionAll: z.boolean().optional()
-});
-
-const pollMessagePayloadSchema = z.object({
-  poll: z.object({
-    name: z.string().min(1),
-    values: z.array(z.string()).min(1),
-    selectableCount: z.number().int().positive().optional()
-  })
+  mentions: z.array(z.string()).optional()
 });
 
 const eventCreationMessagePayloadSchema = z.object({
@@ -27,7 +18,7 @@ const eventCreationMessagePayloadSchema = z.object({
   })
 });
 
-const messagePayloadSchema = z.union([textMessagePayloadSchema, pollMessagePayloadSchema, eventCreationMessagePayloadSchema]);
+const messagePayloadSchema = z.union([textMessagePayloadSchema, eventCreationMessagePayloadSchema]);
 
 type MessageQueueRow = typeof messageQueue.$inferSelect;
 

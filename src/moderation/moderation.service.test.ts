@@ -116,7 +116,8 @@ void test("the warning says why the message disappeared", async () => {
   await punish(buildService(queue, new FakeRepository(), new FakeActions()));
 
   const text = (queue.enqueued[0].payload as TextMessagePayload).text;
-  assert.match(text, /divulgação de vagas/i);
+  assert.match(text, /tecnologia/i);
+  assert.match(text, /Off Topic/);
   assert.match(text, /removida/i);
 });
 

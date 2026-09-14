@@ -1,36 +1,13 @@
 import { env } from "../config/env.js";
 import { logger } from "../shared/logger.js";
 
-// This classifier decides whether someone's message gets deleted, and three deletions get them
-// removed from the community. That asymmetry drives every choice here: letting a bit of chatter
-// through costs almost nothing, while deleting a real job posting - or a question the group is
-// there to answer - takes something from a real person who will not know why.
+// This classifier decides whether someone's message gets deleted, and repeated deletions can get
+// them removed from the community. That asymmetry drives every choice here: letting a bit of
+// chatter through costs almost nothing, while deleting a real technical question or career
+// conversation takes something from a real person who will not know why.
 //
 // So the prompt is deliberately biased towards allowing, and every failure path (no key, timeout,
 // bad response, unparseable answer) resolves to "allowed" rather than to a deletion.
-const jobsSystemPrompt = [
-  "Você modera um grupo de WhatsApp cujo único propósito é a divulgação de vagas de emprego em",
-  "tecnologia. Você recebe uma mensagem e decide se ela pertence ao grupo.",
-  "",
-  "PERMITIDO (responda allow):",
-  "- Divulgação de vaga, estágio, freelance ou oportunidade de trabalho, completa ou não.",
-  "- Pedido para o bot filtrar ou buscar vagas (ex.: 'vagas de junior frontend').",
-  "- Pergunta ou detalhe sobre uma vaga que foi divulgada (salário, requisito, link, contato).",
-  "- Alguém se candidatando, pedindo indicação ou dizendo que enviou currículo para uma vaga.",
-  "- Recrutador pedindo perfis para uma vaga.",
-  "",
-  "NÃO PERMITIDO (responda remove):",
-  "- Conversa paralela sem relação com vaga nenhuma (bom dia, papo furado, política, memes).",
-  "- Divulgação de curso, produto, serviço, canal ou grupo - isso não é vaga.",
-  "- Corrente, spam, golpe ou conteúdo ofensivo.",
-  "",
-  "REGRA DECISIVA: na dúvida, responda allow. É muito pior apagar uma vaga de verdade do que",
-  "deixar passar uma conversa. Só responda remove quando estiver claro que a mensagem não tem",
-  "nenhuma relação com vagas.",
-  "",
-  'Responda APENAS com um JSON: {"decision":"allow"|"remove","reason":"<motivo curto>"}'
-].join("\n");
-
 const networkingSystemPrompt = [
   "Voce modera um grupo de WhatsApp da comunidade FullDev para networking profissional em tecnologia.",
   "Voce recebe uma mensagem e decide se ela pertence ao grupo.",
@@ -65,8 +42,8 @@ const ALLOWED: ModerationDecision = { allowed: true, reason: "default-allow" };
 
 export function buildClassificationPrompt(text: string, imageDescription?: string): string {
   if (imageDescription) {
-    // A job posted as a flyer arrives with no text at all. Judging it without the description
-    // would delete a perfectly valid posting for being "empty".
+    // A useful image can arrive with no text at all. Judging it without the description would
+    // delete a potentially valid technical/career post for being "empty".
     return [
       "Mensagem enviada no grupo:",
       text.trim().length > 0 ? text.trim() : "(sem texto)",
@@ -77,13 +54,6 @@ export function buildClassificationPrompt(text: string, imageDescription?: strin
   }
 
   return `Mensagem enviada no grupo:\n${text.trim()}`;
-}
-
-export async function classifyJobsGroupMessage(
-  text: string,
-  imageDescription?: string
-): Promise<ModerationDecision> {
-  return classifyWithPrompt(jobsSystemPrompt, text, imageDescription);
 }
 
 export async function classifyNetworkingGroupMessage(

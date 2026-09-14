@@ -48,10 +48,10 @@ export class ModerationService {
     const actions = this.options.actions;
     const repository = this.options.repository ?? moderationRepository;
     const queue = this.options.queue ?? queueService;
-    const limit = this.options.strikeLimit ?? env.JOBS_MODERATION_STRIKE_LIMIT;
-    const blockDays = this.options.blockDays ?? env.JOBS_MODERATION_BLOCK_DAYS;
-    const warningMessage = this.options.warningMessage ?? buildWarningMessage;
-    const removalMessage = this.options.removalMessage ?? buildRemovalMessage;
+    const limit = this.options.strikeLimit ?? env.NETWORKING_MODERATION_STRIKE_LIMIT;
+    const blockDays = this.options.blockDays ?? env.NETWORKING_MODERATION_BLOCK_DAYS;
+    const warningMessage = this.options.warningMessage ?? buildNetworkingWarningMessage;
+    const removalMessage = this.options.removalMessage ?? buildNetworkingRemovalMessage;
     const now = (this.options.now ?? (() => new Date()))();
 
     if (actions) {
@@ -111,27 +111,6 @@ export class ModerationService {
     logger.info({ ...input, strikes, blockedUntil }, "Participant removed after reaching the strike limit");
     return { strikes, limit, removed: true, blockedUntil };
   }
-}
-
-export function buildWarningMessage(tag: string, strikes: number, limit: number): string {
-  return [
-    `${tag} sua mensagem foi removida: este grupo é só para divulgação de vagas.`,
-    "",
-    `Malha fina: ${strikes}/${limit}.`,
-    "",
-    `Ao chegar em ${limit}/${limit} você é removido do grupo. Para conversar sobre outros assuntos,`,
-    "use os grupos de networking da comunidade."
-  ].join("\n");
-}
-
-export function buildRemovalMessage(tag: string, limit: number, blockDays: number): string {
-  return [
-    `${tag} malha fina ${limit}/${limit}. Você está sendo removido do grupo.`,
-    "",
-    `Poderá voltar a entrar daqui a ${blockDays} dias. Até lá, pedidos de entrada não serão aceitos.`,
-    "",
-    "Este grupo é exclusivo para divulgação de vagas."
-  ].join("\n");
 }
 
 export function buildNetworkingWarningMessage(tag: string, strikes: number, limit: number): string {

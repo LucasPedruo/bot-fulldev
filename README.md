@@ -478,65 +478,14 @@ GROUP_INTRODUCTION_ENABLED=false
 ```
 
 
-## Moderacao dos grupos de vagas
-
-Os grupos de vagas existem so para divulgacao de vaga. Mensagem que nao e vaga (nem pedido pro bot
-filtrar vagas) e apagada, e quem mandou leva um ponto na **malha fina**. Na terceira, o membro e
-removido e fica bloqueado por `JOBS_MODERATION_BLOCK_DAYS` dias.
-
-**Admins do grupo sao isentos** — a checagem vem antes de qualquer outra coisa
-(`createJobsModerationListener`, `src/moderation/moderation-listener.ts`).
-
-Exige que o bot seja **admin** dos grupos de vagas: apagar mensagem e remover membro precisam disso.
-
-### Por que o classificador e enviesado
-
-Uma decisao errada aqui apaga a mensagem de uma pessoa real e, na terceira, tira ela da comunidade
-sem que ela entenda o motivo. Errar deixando passar uma conversa custa quase nada. Por isso o prompt
-manda **permitir sempre que houver duvida**, e todo caminho de falha resolve para permitido:
-
-- Sem `GROQ_API_KEY` → permite.
-- Timeout, HTTP de erro, resposta vazia → permite.
-- JSON invalido ou `decision` diferente da string exata `remove` → permite.
-- Nao conseguiu ler a lista de admins → **nao modera nada** (podia estar apagando mensagem de admin).
-
-`temperature: 0` para que a mesma mensagem nao seja apagada hoje e mantida amanha.
-
-**Vaga em imagem**: divulgacao costuma vir como flyer, sem texto nenhum. O listener descreve a
-imagem primeiro (mesma IA de visao da acessibilidade) e passa a descricao pro classificador — sem
-isso, uma vaga legitima seria apagada por "estar vazia". Por isso o listener de acessibilidade e
-registrado **antes** do de moderacao em `server.ts`.
-
-### Malha fina e bloqueio
-
-Estado em duas tabelas (migration `0013`):
-
-- `moderation_strikes` — contagem por pessoa **por grupo**, entao escorregar num grupo de vagas nao
-  conta pra remocao de outro.
-- `group_blocklist` — quem foi removido e ate quando. `blocked_until` e o que a aprovacao
-  automatica de entrada consulta (`JoinRequestService`): pedido de quem esta bloqueado e recusado.
-
-Ao remover, a contagem e **zerada**. Passado o bloqueio a pessoa pode voltar e tem as tres chances
-de novo, em vez de ser removida na primeira mensagem. As linhas do blocklist nao sao apagadas na
-expiracao — ficam como historico de quem foi removido e quando.
-
-O aviso de remocao e enfileirado **antes** da remocao: depois de fora do grupo a pessoa nao le mais
-nada. Avisos ignoram o silencio noturno, porque explicam uma mensagem que acabou de sumir.
-
-```env
-JOBS_MODERATION_ENABLED=false
-JOBS_MODERATION_STRIKE_LIMIT=3
-JOBS_MODERATION_BLOCK_DAYS=14
-```
-
 ## Moderacao dos grupos de networking
 
 Os grupos de networking permitem discussoes de tecnologia, duvidas tecnicas, carreira, debates
 gerais de tecnologia, colaboracao, ajuda e alinhamentos de projeto. Assuntos fora disso devem ser
 levados para o grupo Off Topic.
 
-A moderacao usa o mesmo mecanismo dos grupos de vagas: mensagem removida, ponto na **malha fina**
-e remocao/bloqueio ao atingir o limite. A diferenca esta no classificador e nas mensagens de aviso
+A moderacao apaga mensagens fora das regras, registra ponto na **malha fina**
+e remove/bloqueia ao atingir o limite. A regra existe apenas para os grupos de networking
 (`createNetworkingModerationListener`, `src/moderation/moderation-listener.ts`).
 
 Nao e permitido no networking:
@@ -547,9 +496,19 @@ Nao e permitido no networking:
 - Conteudo sensivel, links/material de pirataria, spam, golpes ou correntes.
 - Figurinhas ou conteudo politico.
 
-Admins do grupo continuam isentos e, como em Vagas, o bot precisa ser **admin** para apagar
-mensagens e remover membros. O classificador tambem permite em caso de duvida ou falha da IA, para
-evitar apagar uma duvida tecnica ou conversa de carreira legitima.
+Admins do grupo continuam isentos e o bot precisa ser **admin** para apagar mensagens e remover
+membros. O classificador tambem permite em caso de duvida ou falha da IA, para evitar apagar uma
+duvida tecnica ou conversa de carreira legitima.
+
+Estado em duas tabelas (migration `0013`):
+
+- `moderation_strikes` — contagem por pessoa **por grupo**.
+- `group_blocklist` — quem foi removido e ate quando. `blocked_until` e o que a aprovacao
+  automatica de entrada consulta (`JoinRequestService`): pedido de quem esta bloqueado e recusado.
+
+Ao remover, a contagem e **zerada**. Passado o bloqueio a pessoa pode voltar e tem as tres chances
+de novo, em vez de ser removida na primeira mensagem. As linhas do blocklist nao sao apagadas na
+expiracao — ficam como historico de quem foi removido e quando.
 
 ```env
 NETWORKING_MODERATION_ENABLED=false
@@ -620,7 +579,7 @@ Sympla foi descartado como fonte de scraping: alem da mesma restricao de API do 
 
 Lembretes automaticos em 7 dias, 3 dias, 1 dia (amanha) e no dia do evento, uma vez por tipo por evento (nunca reenvia, controlado pela tabela `event_notifications`), comparando a data do evento (guardada em UTC) contra o dia civil em `America/Sao_Paulo`, as `EVENT_REMINDER_TIME` (padrao 09:00) via `EventRemindersScheduler`.
 
-**Promocao 5 dias antes**: `EventPromoScheduler` (`src/scheduler/event-promo.scheduler.ts`, horario `EVENT_PROMO_TIME`, padrao 10:00) cria, uma vez por evento, um **Evento nativo do WhatsApp** (`{event: {...}}`, suportado pelo Baileys), uma **enquete nativa** ("Vai participar de X? Sim/Nao/Talvez") e uma mensagem perguntando quem vai marcando **todo mundo do grupo via `mentionAll` nativo do WhatsApp** (o mesmo mecanismo do "@todos" — `contextInfo.nonJidMentions`, sem precisar listar/resolver o JID de cada participante) — tudo isso 5 dias antes da data, entre os lembretes de 7 e 3 dias (`EventService.sendPromotions`, tipo de fila `event_promo`, notificacao `event_promo` — mesma logica de "so uma vez" dos lembretes).
+**Promocao 5 dias antes**: `EventPromoScheduler` (`src/scheduler/event-promo.scheduler.ts`, horario `EVENT_PROMO_TIME`, padrao 10:00) cria, uma vez por evento, um **Evento nativo do WhatsApp** (`{event: {...}}`, suportado pelo Baileys) 5 dias antes da data, entre os lembretes de 7 e 3 dias (`EventService.sendPromotions`, tipo de fila `event_promo`, notificacao `event_promo` — mesma logica de "so uma vez" dos lembretes). Ele nao cria enquete e nao marca todo mundo no grupo.
 
 **Perguntar sobre eventos**: **marcando o bot** com `@` no grupo de Eventos (ex.: "@bot tem evento em outubro?", "@bot tem evento em Recife?"), ele responde com o que ja esta no banco por mes e/ou localidade — parsing best-effort do texto (`src/events/event-query.ts`), consultando `EventRepository.query()` via `EventQnaService`. Sem mencionar o bot, nenhuma mensagem do grupo recebe resposta (uma versao anterior respondia a qualquer mensagem que parecesse pergunta e disparava sem querer com conversa comum contendo a palavra "evento" - corrigido pra exigir a mencao). Uma mencao sem mes/local especifico (so "@bot tem evento?") lista os proximos eventos cadastrados.
 

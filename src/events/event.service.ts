@@ -134,8 +134,7 @@ export class EventService {
   }
 
   // Runs once a day, independent of the 7/3/1/day-of reminders: 5 days out, turn the event into a
-  // native WhatsApp Event + a "vai participar?" poll + a text mentioning everyone, so the group gets
-  // one clear moment to RSVP instead of just reading another reminder line.
+  // native WhatsApp Event so the group has a structured reminder without polls or @todos.
   async sendPromotions(): Promise<{ sent: number }> {
     const destinationGroup = getConfiguredWhatsAppGroups().eventsGroup;
     if (!destinationGroup) {
@@ -170,18 +169,6 @@ export class EventService {
             startDateIso: event.startDate.toISOString()
           }
         }
-      });
-
-      await this.queue.enqueue({
-        type: "event_promo",
-        destinationGroup,
-        payload: { poll: { name: `Vai participar de ${event.title}?`, values: ["Sim", "Não", "Talvez"] } }
-      });
-
-      await this.queue.enqueue({
-        type: "event_promo",
-        destinationGroup,
-        payload: { text: `Quem vai em "${event.title}"? Responde na enquete acima! @todos`, mentionAll: true }
       });
 
       sent += 1;

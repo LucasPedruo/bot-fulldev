@@ -8,7 +8,6 @@ import { createEventQnaListener } from "./events/event-qna-listener.js";
 import { createFacultyRelayListener } from "./faculty/faculty-relay-listener.js";
 import { createJobQnaListener } from "./jobs/job-qna-listener.js";
 import {
-  createJobsModerationListener,
   createNetworkingModerationListener,
   createWhatsAppModerationActions
 } from "./moderation/moderation-listener.js";
@@ -81,16 +80,10 @@ async function start(): Promise<void> {
       messageHandlers.push(createFacultyRelayListener());
     }
 
-    // Registered BEFORE the moderation listener on purpose: handlers run in order, and a job
-    // posted as a flyer should be described (and so become classifiable) before anything decides
-    // whether to delete it.
+    // Registered BEFORE the moderation listener on purpose: handlers run in order, and an image
+    // should be described (and so become classifiable) before anything decides whether to delete it.
     if (env.IMAGE_DESCRIPTION_ENABLED) {
       messageHandlers.push(createImageDescriptionListener());
-    }
-
-    if (env.JOBS_MODERATION_ENABLED) {
-      const moderation = new ModerationService({ actions: createWhatsAppModerationActions() });
-      messageHandlers.push(createJobsModerationListener({ service: moderation }));
     }
 
     if (env.NETWORKING_MODERATION_ENABLED) {

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { WAMessage } from "@whiskeysockets/baileys";
-import { createJobsModerationListener, createNetworkingModerationListener } from "./moderation-listener.js";
+import { createNetworkingModerationListener } from "./moderation-listener.js";
 import type { StrikeOutcome } from "./moderation.service.js";
 
-const jobsGroup = "120363391901542507@g.us";
+const nonNetworkingGroup = "120363391901542507@g.us";
 const networkingGroup = "120363000000000001@g.us";
 const member = "5511987654321@s.whatsapp.net";
 const admin = "5521999998888@s.whatsapp.net";
@@ -27,7 +27,7 @@ function buildMessage(overrides: {
   image?: boolean;
   sticker?: boolean;
 }): WAMessage {
-  const { remoteJid = jobsGroup, participant = member, fromMe = false, text, image, sticker } = overrides;
+  const { remoteJid = networkingGroup, participant = member, fromMe = false, text, image, sticker } = overrides;
   const message = sticker
     ? { stickerMessage: { mimetype: "image/webp" } }
     : image
@@ -52,8 +52,8 @@ function buildListener(
     describeMedia?: (message: WAMessage) => Promise<string | undefined>;
   } = {}
 ) {
-  return createJobsModerationListener({
-    jobsGroups: [jobsGroup],
+  return createNetworkingModerationListener({
+    groups: [networkingGroup],
     service,
     isGroupAdmin: overrides.isGroupAdmin ?? neverAdmin,
     describeMedia: overrides.describeMedia ?? noMedia,
@@ -91,7 +91,7 @@ void test("leaves an allowed message alone", async () => {
   assert.deepEqual(service.punished, []);
 });
 
-void test("ignores messages from groups that are not jobs groups", async () => {
+void test("ignores messages from groups that are not networking groups", async () => {
   const service = new FakeService();
 
   await buildListener(service)(buildMessage({ remoteJid: "120363306015581649@g.us", text: "bom dia" }));
@@ -116,19 +116,19 @@ void test("does nothing when the admin list cannot be read", async () => {
   assert.deepEqual(service.punished, []);
 });
 
-void test("judges a flyer by its description instead of deleting it for being empty", async () => {
+void test("judges an image by its description instead of deleting it for being empty", async () => {
   const service = new FakeService();
   const seen: Array<string | undefined> = [];
 
   await buildListener(service, {
-    describeMedia: async () => Promise.resolve("Cartaz anunciando vaga de estágio em TI"),
+    describeMedia: async () => Promise.resolve("Print com uma duvida tecnica sobre TypeScript"),
     classify: async (_text, description) => {
       seen.push(description);
-      return Promise.resolve({ allowed: true, reason: "vaga em imagem" });
+      return Promise.resolve({ allowed: true, reason: "duvida tecnica em imagem" });
     }
   })(buildMessage({ image: true }));
 
-  assert.deepEqual(seen, ["Cartaz anunciando vaga de estágio em TI"]);
+  assert.deepEqual(seen, ["Print com uma duvida tecnica sobre TypeScript"]);
   assert.deepEqual(service.punished, []);
 });
 
@@ -151,8 +151,8 @@ void test("deletes a sticker even when it cannot be described", async () => {
   const service = new FakeService();
   let classified = false;
 
-  // The production failure: the media host in the proto no longer resolved, the description came
-  // back empty, and the listener gave up - so a sticker sat in the jobs group untouched.
+  // The media host in the proto can expire; a sticker must not slip through just because download
+  // or description failed.
   await buildListener(service, {
     describeMedia: async () => Promise.resolve(undefined),
     classify: async () => {
@@ -193,8 +193,7 @@ void test("an admin's sticker is still left alone", async () => {
 void test("keeps an image it could not describe instead of deleting blind", async () => {
   const service = new FakeService();
 
-  // It could be a flyer with a real vacancy; deleting on a failed download would punish someone
-  // for our own outage.
+  // It could be useful content; deleting on a failed download would punish someone for our own outage.
   await buildListener(service, { describeMedia: async () => Promise.resolve(undefined) })(
     buildMessage({ image: true })
   );
@@ -229,7 +228,7 @@ void test("networking moderation ignores non-networking groups", async () => {
     classify: async () => Promise.resolve({ allowed: false, reason: "off-topic" })
   });
 
-  await listener(buildMessage({ remoteJid: jobsGroup, text: "bom dia" }));
+  await listener(buildMessage({ remoteJid: nonNetworkingGroup, text: "bom dia" }));
 
   assert.deepEqual(service.punished, []);
 });

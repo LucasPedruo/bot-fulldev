@@ -7,16 +7,6 @@ export type MessageQueueType = (typeof messageQueueTypes)[number];
 export type TextMessagePayload = {
   text: string;
   mentions?: string[];
-  /** WhatsApp's native "mention everyone" - tags the whole group without enumerating JIDs. */
-  mentionAll?: boolean;
-};
-
-export type PollMessagePayload = {
-  poll: {
-    name: string;
-    values: string[];
-    selectableCount?: number;
-  };
 };
 
 export type EventCreationMessagePayload = {
@@ -30,7 +20,7 @@ export type EventCreationMessagePayload = {
   };
 };
 
-export type MessagePayload = TextMessagePayload | PollMessagePayload | EventCreationMessagePayload;
+export type MessagePayload = TextMessagePayload | EventCreationMessagePayload;
 
 export type QueueMessage = {
   id: string;

@@ -135,11 +135,6 @@ const envSchema = z.object({
   GROQ_VISION_MODEL: z.string().min(1).default("qwen/qwen3.8-27b"),
   // Groq rejects oversized payloads, and a base64 image is ~33% larger than the file.
   IMAGE_DESCRIPTION_MAX_BYTES: z.coerce.number().int().positive().default(3_000_000),
-  // Jobs-group moderation: deletes off-topic messages, strikes the sender, and removes them on
-  // the third strike. Admins are never touched.
-  JOBS_MODERATION_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
-  JOBS_MODERATION_STRIKE_LIMIT: z.coerce.number().int().min(1).default(3),
-  JOBS_MODERATION_BLOCK_DAYS: z.coerce.number().int().positive().default(14),
   // Networking moderation: keeps networking groups focused on technology, career, project work
   // and respectful technical debate. Admins are never touched.
   NETWORKING_MODERATION_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
