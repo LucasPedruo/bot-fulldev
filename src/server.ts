@@ -8,10 +8,13 @@ import { createEventQnaListener } from "./events/event-qna-listener.js";
 import { createFacultyRelayListener } from "./faculty/faculty-relay-listener.js";
 import { createJobQnaListener } from "./jobs/job-qna-listener.js";
 import {
+  createJobsModerationListener,
   createNetworkingModerationListener,
   createWhatsAppModerationActions
 } from "./moderation/moderation-listener.js";
 import {
+  buildJobsRemovalMessage,
+  buildJobsWarningMessage,
   buildNetworkingRemovalMessage,
   buildNetworkingWarningMessage,
   ModerationService
@@ -84,6 +87,17 @@ async function start(): Promise<void> {
     // should be described (and so become classifiable) before anything decides whether to delete it.
     if (env.IMAGE_DESCRIPTION_ENABLED) {
       messageHandlers.push(createImageDescriptionListener());
+    }
+
+    if (env.JOBS_MODERATION_ENABLED) {
+      const moderation = new ModerationService({
+        actions: createWhatsAppModerationActions(),
+        strikeLimit: env.JOBS_MODERATION_STRIKE_LIMIT,
+        blockDays: env.JOBS_MODERATION_BLOCK_DAYS,
+        warningMessage: buildJobsWarningMessage,
+        removalMessage: buildJobsRemovalMessage
+      });
+      messageHandlers.push(createJobsModerationListener({ service: moderation }));
     }
 
     if (env.NETWORKING_MODERATION_ENABLED) {

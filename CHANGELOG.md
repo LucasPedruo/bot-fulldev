@@ -7,6 +7,12 @@ WhatsApp**: frases curtas, sem jargão interno, sem nome de arquivo.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o versionamento é
 [semântico](https://semver.org/lang/pt-BR/).
 
+## [0.4.6] - 2026-09-14
+
+### Corrigido
+
+- A malha fina de vagas continua nos grupos gerais de vagas; apenas o grupo Vagas e estagios fica fora.
+
 ## [0.4.5] - 2026-09-14
 
 ### Removido

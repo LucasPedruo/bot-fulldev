@@ -477,6 +477,24 @@ grupo dos outros pegaria mal.
 GROUP_INTRODUCTION_ENABLED=false
 ```
 
+## Moderacao dos grupos de vagas
+
+A malha fina dos grupos de vagas continua ativa somente nos grupos gerais
+`WHATSAPP_JOBS_GROUP_1` e `WHATSAPP_JOBS_GROUP_2`
+(`createJobsModerationListener`, `src/moderation/moderation-listener.ts`).
+O grupo da faculdade **Vagas e estagios** (`WHATSAPP_FACULTY_JOBS_GROUP`) fica fora dessa
+moderacao.
+
+O bot apaga mensagens que claramente nao sao vagas, registra ponto na **malha fina**
+e remove/bloqueia ao atingir o limite. Admins do grupo continuam isentos e o bot precisa ser
+**admin** para apagar mensagens e remover membros.
+
+```env
+JOBS_MODERATION_ENABLED=false
+JOBS_MODERATION_STRIKE_LIMIT=3
+JOBS_MODERATION_BLOCK_DAYS=14
+```
+
 
 ## Moderacao dos grupos de networking
 

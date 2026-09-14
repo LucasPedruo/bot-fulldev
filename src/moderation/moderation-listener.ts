@@ -7,19 +7,36 @@ import { downloadMedia } from "../shared/media.js";
 import { extractMessageText } from "../shared/messages.js";
 import { whatsapp } from "../whatsapp/client.js";
 import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
-import { classifyNetworkingGroupMessage } from "./moderation.classifier.js";
+import { classifyJobsGroupMessage, classifyNetworkingGroupMessage } from "./moderation.classifier.js";
 import { moderationService, type ModerationActions, type ModerationService } from "./moderation.service.js";
 
 export type ModerationListenerOptions = {
   groups?: string[];
+  jobsGroups?: string[];
   service?: Pick<ModerationService, "punish">;
   classify?: (text: string, imageDescription?: string) => Promise<{ allowed: boolean; reason: string }>;
   isGroupAdmin?: (groupJid: string, senderJid: string) => Promise<boolean>;
   describeMedia?: (message: WAMessage) => Promise<string | undefined>;
 };
 
+export function getModeratedJobsGroups(): string[] {
+  const groups = getConfiguredWhatsAppGroups();
+  // The college "Vagas e estagios" group is intentionally not moderated by malha fina.
+  return [groups.jobsGroup1, groups.jobsGroup2].filter((jid) => jid.length > 0);
+}
+
 export function getModeratedNetworkingGroups(): string[] {
   return getConfiguredWhatsAppGroups().networkingGroups;
+}
+
+export function createJobsModerationListener(
+  options: ModerationListenerOptions = {}
+): (message: WAMessage) => Promise<void> {
+  return createGroupModerationListener({
+    ...options,
+    groups: options.groups ?? options.jobsGroups ?? getModeratedJobsGroups(),
+    classify: options.classify ?? classifyJobsGroupMessage
+  });
 }
 
 export function createNetworkingModerationListener(
@@ -36,13 +53,13 @@ function createGroupModerationListener(
   options: ModerationListenerOptions
 ): (message: WAMessage) => Promise<void> {
   const service = options.service ?? moderationService;
-  const classify = options.classify ?? classifyNetworkingGroupMessage;
+  const classify = options.classify ?? classifyJobsGroupMessage;
   const isGroupAdmin = options.isGroupAdmin ?? createAdminChecker();
   const describeMedia = options.describeMedia ?? defaultDescribeMedia;
 
   return async function handleIncomingMessage(message: WAMessage): Promise<void> {
     const groupJid = message.key?.remoteJid;
-    const groups = options.groups ?? getModeratedNetworkingGroups();
+    const groups = options.groups ?? getModeratedJobsGroups();
 
     if (!groupJid || !groups.includes(groupJid) || message.key.fromMe) {
       return;
@@ -69,9 +86,9 @@ function createGroupModerationListener(
     const text = extractMessageText(message) ?? "";
     const media = findDescribableMedia(message);
 
-    // Stickers are not part of the networking rules, so they are off-topic by construction. This
-    // is decided before any download because expired media should not make a forbidden sticker
-    // silently slip through.
+    // Stickers are not a job posting or a useful networking/career discussion, so they are
+    // off-topic by construction. This is decided before any download because expired media should
+    // not make a forbidden sticker silently slip through.
     if (media?.isSticker) {
       await service.punish({
         groupJid,

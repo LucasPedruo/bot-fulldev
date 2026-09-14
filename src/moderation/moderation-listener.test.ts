@@ -1,13 +1,27 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { WAMessage } from "@whiskeysockets/baileys";
-import { createNetworkingModerationListener } from "./moderation-listener.js";
+import { env } from "../config/env.js";
+import {
+  createJobsModerationListener,
+  createNetworkingModerationListener,
+  getModeratedJobsGroups
+} from "./moderation-listener.js";
 import type { StrikeOutcome } from "./moderation.service.js";
 
-const nonNetworkingGroup = "120363391901542507@g.us";
+const jobsGroup = "120363391901542507@g.us";
+const jobsGroup2 = "120363417654610744@g.us";
+const facultyJobsGroup = "120363401995520356@g.us";
 const networkingGroup = "120363000000000001@g.us";
+const nonNetworkingGroup = jobsGroup;
 const member = "5511987654321@s.whatsapp.net";
 const admin = "5521999998888@s.whatsapp.net";
+
+Object.assign(env, {
+  WHATSAPP_JOBS_GROUP_1: jobsGroup,
+  WHATSAPP_JOBS_GROUP_2: jobsGroup2,
+  WHATSAPP_FACULTY_JOBS_GROUP: facultyJobsGroup
+});
 
 class FakeService {
   public punished: Array<{ groupJid: string; participantJid: string; reason: string }> = [];
@@ -58,6 +72,24 @@ function buildListener(
     isGroupAdmin: overrides.isGroupAdmin ?? neverAdmin,
     describeMedia: overrides.describeMedia ?? noMedia,
     classify: overrides.classify ?? (async () => Promise.resolve({ allowed: false, reason: "papo furado" }))
+  });
+}
+
+function buildJobsListener(
+  service: FakeService,
+  overrides: {
+    groups?: string[];
+    classify?: (text: string, description?: string) => Promise<{ allowed: boolean; reason: string }>;
+    isGroupAdmin?: (groupJid: string, senderJid: string) => Promise<boolean>;
+    describeMedia?: (message: WAMessage) => Promise<string | undefined>;
+  } = {}
+) {
+  return createJobsModerationListener({
+    groups: overrides.groups,
+    service,
+    isGroupAdmin: overrides.isGroupAdmin ?? neverAdmin,
+    describeMedia: overrides.describeMedia ?? noMedia,
+    classify: overrides.classify ?? (async () => Promise.resolve({ allowed: false, reason: "fora de vagas" }))
   });
 }
 
@@ -231,4 +263,23 @@ void test("networking moderation ignores non-networking groups", async () => {
   await listener(buildMessage({ remoteJid: nonNetworkingGroup, text: "bom dia" }));
 
   assert.deepEqual(service.punished, []);
+});
+
+void test("jobs moderation covers the configured general jobs groups", async () => {
+  const service = new FakeService();
+
+  await buildJobsListener(service)(buildMessage({ remoteJid: jobsGroup, text: "bom dia" }));
+
+  assert.equal(service.punished.length, 1);
+  assert.equal(service.punished[0].groupJid, jobsGroup);
+  assert.equal(service.punished[0].reason, "fora de vagas");
+});
+
+void test("jobs moderation excludes the faculty Vagas e estagios group from malha fina", async () => {
+  const service = new FakeService();
+
+  await buildJobsListener(service)(buildMessage({ remoteJid: facultyJobsGroup, text: "bom dia" }));
+
+  assert.deepEqual(service.punished, []);
+  assert.deepEqual(getModeratedJobsGroups(), [jobsGroup, jobsGroup2]);
 });

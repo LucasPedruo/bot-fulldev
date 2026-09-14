@@ -126,6 +126,27 @@ export function buildNetworkingWarningMessage(tag: string, strikes: number, limi
   ].join("\n");
 }
 
+export function buildJobsWarningMessage(tag: string, strikes: number, limit: number): string {
+  return [
+    `${tag} sua mensagem foi removida: este grupo e so para divulgacao de vagas.`,
+    "",
+    `Malha fina: ${strikes}/${limit}.`,
+    "",
+    `Ao chegar em ${limit}/${limit} voce e removido do grupo. Para conversar sobre outros assuntos,`,
+    "use os grupos de networking da comunidade."
+  ].join("\n");
+}
+
+export function buildJobsRemovalMessage(tag: string, limit: number, blockDays: number): string {
+  return [
+    `${tag} malha fina ${limit}/${limit}. Voce esta sendo removido do grupo.`,
+    "",
+    `Podera voltar a entrar daqui a ${blockDays} dias. Ate la, pedidos de entrada nao serao aceitos.`,
+    "",
+    "Este grupo e exclusivo para divulgacao de vagas."
+  ].join("\n");
+}
+
 export function buildNetworkingRemovalMessage(tag: string, limit: number, blockDays: number): string {
   return [
     `${tag} malha fina ${limit}/${limit}. Voce esta sendo removido do grupo.`,
