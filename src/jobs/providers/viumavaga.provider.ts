@@ -30,6 +30,7 @@ type ViumavagaJob = z.infer<typeof viumavagaJobSchema>;
 
 const endpoint = "https://viumavaga.com.br/conecta/wp-json/v1v/v1/vagas";
 const pageSize = 50;
+const maxPagesPerPoll = 4;
 
 export class ViumavagaProvider implements JobProvider {
   public readonly name = "ViUmaVaga";
@@ -45,15 +46,19 @@ export class ViumavagaProvider implements JobProvider {
     let totalPages = 1;
 
     try {
-      for (let page = 1; page <= totalPages && jobs.length < env.VIUMAVAGA_JOBS_COUNT; page += 1) {
+      for (let page = 1; page <= totalPages && page <= maxPagesPerPoll && jobs.length < env.VIUMAVAGA_JOBS_COUNT; page += 1) {
         const response = await this.fetchPage(page);
-        totalPages = Math.min(response.pagination.total_pages, Math.ceil(env.VIUMAVAGA_JOBS_COUNT / pageSize));
+        totalPages = Math.min(response.pagination.total_pages, maxPagesPerPoll);
 
         if (response.data.length === 0) {
           break;
         }
 
-        jobs.push(...response.data.map(normalizeViumavagaJob));
+        jobs.push(
+          ...response.data
+            .map(normalizeViumavagaJob)
+            .filter((job) => job.level === "intern" || job.level === "junior" || job.level === "mid")
+        );
       }
 
       const result = jobs.slice(0, env.VIUMAVAGA_JOBS_COUNT);

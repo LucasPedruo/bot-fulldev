@@ -246,7 +246,7 @@ GET https://viumavaga.com.br/conecta/wp-json/v1v/v1/vagas?page=1&per_page=50
 Authorization: Bearer $V1V_API_TOKEN
 ```
 
-O provedor pagina conforme `VIUMAVAGA_JOBS_COUNT` (maximo 200, em lotes de 50) e usa o titulo, empresa, local, modalidade e data de publicacao. A API fornece apenas resumos; o bot nao republica descricoes. O link original, incluindo todas as UTMs do parceiro, e preservado, e a mensagem inclui o credito `via ViUmaVaga`. O limite documentado e 60 consultas por hora; com o poll padrao de 5 minutos e ate 200 vagas, o bot faz no maximo 48 consultas por hora.
+O provedor usa o titulo, empresa, local, modalidade e data de publicacao, e inclui apenas vagas cujo titulo identifique estagio, junior ou pleno. Pode consultar ate quatro paginas de 50 por rodada enquanto busca vagas elegiveis. A API fornece apenas resumos; o bot nao republica descricoes. O link original, incluindo todas as UTMs do parceiro, e preservado, e a mensagem inclui o credito `via ViUmaVaga`. O limite documentado e 60 consultas por hora; com o poll padrao de 5 minutos, o bot faz no maximo 48 consultas por hora.
 
 Sem um campo de nivel estruturado (diferente do `seniority` do Himalayas), o Greenhouse so inclui uma vaga quando o **titulo** menciona estagio/junior/pleno explicitamente — vagas ambiguas (sem nenhuma palavra de nivel no titulo) ficam de fora por seguranca, mesmo que pudessem ser junior/pleno na pratica. Diferente dos outros 4 providers, o Greenhouse nao filtra por remoto: cada board e de uma empresa brasileira especifica, entao vagas hibridas/presenciais tambem entram (o campo `remote` reflete o texto da localizacao; a mensagem so mostra "Remoto" quando for de fato remoto).
 
