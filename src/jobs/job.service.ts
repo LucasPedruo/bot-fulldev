@@ -12,6 +12,7 @@ import { HimalayasProvider } from "./providers/himalayas.provider.js";
 import { JobicyProvider } from "./providers/jobicy.provider.js";
 import { RemoteokProvider } from "./providers/remoteok.provider.js";
 import { RemotiveProvider } from "./providers/remotive.provider.js";
+import { ViumavagaProvider } from "./providers/viumavaga.provider.js";
 import type { JobProvider } from "./providers/provider.interface.js";
 
 export type JobsPollResult = {
@@ -140,6 +141,7 @@ function createDefaultProviders(): JobProvider[] {
     ...(env.REMOTEOK_JOBS_ENABLED ? [new RemoteokProvider()] : []),
     ...(env.ARBEITNOW_JOBS_ENABLED ? [new ArbeitnowProvider()] : []),
     ...(env.HIMALAYAS_JOBS_ENABLED ? [new HimalayasProvider()] : []),
-    ...(env.GREENHOUSE_JOBS_ENABLED ? [new GreenhouseProvider()] : [])
+    ...(env.GREENHOUSE_JOBS_ENABLED ? [new GreenhouseProvider()] : []),
+    ...(env.VIUMAVAGA_JOBS_ENABLED ? [new ViumavagaProvider()] : [])
   ];
 }

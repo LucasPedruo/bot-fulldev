@@ -39,7 +39,8 @@ export function formatJobMessage(job: NormalizedJob): string {
     lines.push(levelLabels[job.level]);
   }
 
-  lines.push(categoryLabels[job.category], "", "Candidatar:", job.url, "", `Fonte: ${job.source}`);
+  const sourceLabel = job.source === "ViUmaVaga" ? "via ViUmaVaga" : job.source;
+  lines.push(categoryLabels[job.category], "", "Candidatar:", job.url, "", `Fonte: ${sourceLabel}`);
 
   return lines.join("\n");
 }

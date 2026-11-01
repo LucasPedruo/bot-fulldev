@@ -5,6 +5,7 @@ import { HimalayasProvider } from "../providers/himalayas.provider.js";
 import { JobicyProvider } from "../providers/jobicy.provider.js";
 import { RemoteokProvider } from "../providers/remoteok.provider.js";
 import { RemotiveProvider } from "../providers/remotive.provider.js";
+import { ViumavagaProvider } from "../providers/viumavaga.provider.js";
 import type { JobProvider } from "../providers/provider.interface.js";
 
 const providerArg = process.argv.find((arg) => arg.startsWith("--provider="));
@@ -16,7 +17,8 @@ const providersByName: Record<string, () => JobProvider> = {
   remoteok: () => new RemoteokProvider(),
   arbeitnow: () => new ArbeitnowProvider(),
   himalayas: () => new HimalayasProvider(),
-  greenhouse: () => new GreenhouseProvider()
+  greenhouse: () => new GreenhouseProvider(),
+  viumavaga: () => new ViumavagaProvider()
 };
 
 if (process.argv.includes("--dry-run")) {

@@ -68,6 +68,9 @@ const envSchema = z.object({
   HIMALAYAS_JOBS_COUNT: z.coerce.number().int().min(1).max(100).default(20),
   GREENHOUSE_JOBS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
   GREENHOUSE_JOBS_COUNT: z.coerce.number().int().min(1).max(100).default(20),
+  VIUMAVAGA_JOBS_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  VIUMAVAGA_JOBS_COUNT: z.coerce.number().int().min(1).max(200).default(50),
+  V1V_API_TOKEN: z.string().optional().default(""),
   GREENHOUSE_BOARD_SLUGS: z
     .string()
     .min(1)
