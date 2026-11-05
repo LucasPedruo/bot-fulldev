@@ -1,6 +1,6 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "../database/client.js";
-import { groupActivity, groupMembershipLog, mentionReplyLog, networkingSpotlightLog } from "../database/schema.js";
+import { ambientReplyLog, groupActivity, groupMembershipLog, mentionReplyLog, networkingSpotlightLog } from "../database/schema.js";
 
 export type GroupMembershipAction = "add" | "remove";
 export type NetworkingSpotlightSlot = "morning" | "lunch" | "night";
@@ -56,6 +56,43 @@ export class NetworkingRepository {
       .where(and(eq(mentionReplyLog.groupJid, groupJid), gte(mentionReplyLog.repliedAt, since)));
 
     return row?.value ?? 0;
+  }
+
+  async getAmbientReplyMuteUntil(groupJid: string): Promise<Date | undefined> {
+    const [row] = await db.select().from(groupActivity).where(eq(groupActivity.groupJid, groupJid)).limit(1);
+    return row?.ambientReplyMuteUntil ?? undefined;
+  }
+
+  async setAmbientReplyMuteUntil(groupJid: string, until: Date): Promise<void> {
+    await db
+      .insert(groupActivity)
+      .values({ groupJid, ambientReplyMuteUntil: until })
+      .onConflictDoUpdate({ target: groupActivity.groupJid, set: { ambientReplyMuteUntil: until } });
+  }
+
+  async recordAmbientReply(groupJid: string, at: Date = new Date()): Promise<void> {
+    await db.insert(ambientReplyLog).values({ groupJid, repliedAt: at });
+  }
+
+  async countRecentAmbientReplies(groupJid: string, since: Date): Promise<number> {
+    const [row] = await db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(ambientReplyLog)
+      .where(and(eq(ambientReplyLog.groupJid, groupJid), gte(ambientReplyLog.repliedAt, since)));
+
+    return row?.value ?? 0;
+  }
+
+  async getLastAmbientReactionAt(groupJid: string): Promise<Date | undefined> {
+    const [row] = await db.select().from(groupActivity).where(eq(groupActivity.groupJid, groupJid)).limit(1);
+    return row?.lastAmbientReactionAt ?? undefined;
+  }
+
+  async touchAmbientReaction(groupJid: string, at: Date = new Date()): Promise<void> {
+    await db
+      .insert(groupActivity)
+      .values({ groupJid, lastAmbientReactionAt: at })
+      .onConflictDoUpdate({ target: groupActivity.groupJid, set: { lastAmbientReactionAt: at } });
   }
 
   async recordMembershipEvent(groupJid: string, participantJid: string, action: GroupMembershipAction): Promise<void> {

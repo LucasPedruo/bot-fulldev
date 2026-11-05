@@ -147,7 +147,19 @@ const envSchema = z.object({
   // and respectful technical debate. Admins are never touched.
   NETWORKING_MODERATION_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
   NETWORKING_MODERATION_STRIKE_LIMIT: z.coerce.number().int().min(1).default(3),
-  NETWORKING_MODERATION_BLOCK_DAYS: z.coerce.number().int().positive().default(14)
+  NETWORKING_MODERATION_BLOCK_DAYS: z.coerce.number().int().positive().default(14),
+  // Ambient participation: the bot reacts and occasionally comments on regular group chatter, not
+  // just when mentioned. Opt-in like every other side-effecting networking feature - unlike
+  // mentions, nobody asked for this, so it has to stay rare and natural rather than frequent.
+  NETWORKING_AMBIENT_ENGAGEMENT_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  NETWORKING_AMBIENT_AI_ENABLED: z.union([z.boolean(), booleanStringSchema]).default(false),
+  NETWORKING_AMBIENT_REACTION_PROBABILITY: z.coerce.number().min(0).max(1).default(0.15),
+  // Floor between two reactions in the same group, so a burst of messages doesn't get an emoji
+  // on every other line - a real person reacts to the occasional message, not to a stream of them.
+  NETWORKING_AMBIENT_REACTION_MIN_GAP_MINUTES: z.coerce.number().int().positive().default(5),
+  NETWORKING_AMBIENT_REPLY_PROBABILITY: z.coerce.number().min(0).max(1).default(0.04),
+  NETWORKING_AMBIENT_REPLY_MAX_PER_HOUR: z.coerce.number().int().positive().default(3),
+  NETWORKING_AMBIENT_REPLY_COOLDOWN_HOURS: z.coerce.number().int().positive().default(1)
 });
 
 export type Env = z.infer<typeof envSchema>;

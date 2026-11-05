@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { WAMessage } from "@whiskeysockets/baileys";
+import type { WAMessage, WAMessageKey } from "@whiskeysockets/baileys";
 import {
   createNetworkingMessageListener,
+  type AmbientEngagementServiceLike,
   type MentionReplyServiceLike,
   type NetworkingRepositoryLike
 } from "./message-listener.js";
@@ -27,6 +28,15 @@ class FakeMentionService implements MentionReplyServiceLike {
   async handleMention(groupJid: string, senderJid: string, messageText?: string): Promise<void> {
     await Promise.resolve();
     this.handled.push({ groupJid, senderJid, messageText });
+  }
+}
+
+class FakeAmbientService implements AmbientEngagementServiceLike {
+  public handled: Array<{ groupJid: string; messageKey: WAMessageKey; messageText?: string }> = [];
+
+  async handleMessage(groupJid: string, messageKey: WAMessageKey, messageText?: string): Promise<void> {
+    await Promise.resolve();
+    this.handled.push({ groupJid, messageKey, messageText });
   }
 }
 
@@ -74,6 +84,60 @@ void test("tracks activity for a plain networking-group message without replying
 
   assert.deepEqual(repository.touched, [networkingGroups[0]]);
   assert.deepEqual(mentionService.handled, []);
+});
+
+void test("delegates plain networking-group messages to the ambient service", async () => {
+  const repository = new FakeRepository();
+  const mentionService = new FakeMentionService();
+  const ambientService = new FakeAmbientService();
+  const listener = createNetworkingMessageListener({ getBotJids, networkingGroups, repository, mentionService, ambientService });
+
+  await listener(
+    buildMessage({ remoteJid: networkingGroups[0], participant: "5511999999999@s.whatsapp.net", text: "bom dia pessoal" })
+  );
+
+  assert.equal(ambientService.handled.length, 1);
+  assert.equal(ambientService.handled[0].groupJid, networkingGroups[0]);
+  assert.equal(ambientService.handled[0].messageText, "bom dia pessoal");
+});
+
+void test("does not delegate to the ambient service when the bot is mentioned", async () => {
+  const repository = new FakeRepository();
+  const mentionService = new FakeMentionService();
+  const ambientService = new FakeAmbientService();
+  const listener = createNetworkingMessageListener({ getBotJids, networkingGroups, repository, mentionService, ambientService });
+
+  await listener(
+    buildMessage({
+      remoteJid: networkingGroups[0],
+      participant: "5511999999999@s.whatsapp.net",
+      mentionedJid: ["551100000000@s.whatsapp.net"]
+    })
+  );
+
+  assert.deepEqual(ambientService.handled, []);
+});
+
+void test("does not delegate to the ambient service for its own messages", async () => {
+  const repository = new FakeRepository();
+  const mentionService = new FakeMentionService();
+  const ambientService = new FakeAmbientService();
+  const listener = createNetworkingMessageListener({ getBotJids, networkingGroups, repository, mentionService, ambientService });
+
+  await listener(buildMessage({ remoteJid: networkingGroups[0], fromMe: true }));
+
+  assert.deepEqual(ambientService.handled, []);
+});
+
+void test("does not delegate to the ambient service outside configured networking groups", async () => {
+  const repository = new FakeRepository();
+  const mentionService = new FakeMentionService();
+  const ambientService = new FakeAmbientService();
+  const listener = createNetworkingMessageListener({ getBotJids, networkingGroups, repository, mentionService, ambientService });
+
+  await listener(buildMessage({ remoteJid: "120363999999999999@g.us" }));
+
+  assert.deepEqual(ambientService.handled, []);
 });
 
 void test("delegates to the mention service when the bot is mentioned in a networking group", async () => {

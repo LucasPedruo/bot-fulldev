@@ -1,4 +1,9 @@
+import type { WAMessageKey } from "@whiskeysockets/baileys";
 import { whatsapp } from "./client.js";
+
+export async function sendReaction(destinationJid: string, messageKey: WAMessageKey, emoji: string): Promise<void> {
+  await whatsapp.sendReaction(destinationJid, messageKey, emoji);
+}
 
 export async function sendTextMessage(
   destinationJid: string,

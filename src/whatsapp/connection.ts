@@ -7,6 +7,7 @@ import makeWASocket, {
   type BaileysEventMap,
   type GroupMetadata,
   type WAMessage,
+  type WAMessageKey,
   type WASocket
 } from "@whiskeysockets/baileys";
 import { mkdir } from "node:fs/promises";
@@ -188,6 +189,12 @@ export class WhatsAppConnectionManager {
     const socket = this.requireConnectedSocket();
     await socket.sendMessage(destinationJid, { text, mentions });
     this.log.info({ destinationJid, mentionsCount: mentions.length }, "WhatsApp text message sent");
+  }
+
+  async sendReaction(destinationJid: string, messageKey: WAMessageKey, emoji: string): Promise<void> {
+    const socket = this.requireConnectedSocket();
+    await socket.sendMessage(destinationJid, { react: { text: emoji, key: messageKey } });
+    this.log.info({ destinationJid, emoji }, "WhatsApp reaction sent");
   }
 
   async sendEvent(destinationJid: string, name: string, description: string | undefined, startDate: Date, endDate?: Date): Promise<void> {

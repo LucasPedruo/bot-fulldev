@@ -80,6 +80,39 @@ function describePending(pending: number): string {
   return pending === 1 ? "1 pessoa" : `${pending} pessoas`;
 }
 
+// Non-AI fallback for ambient reactions (GROQ_API_KEY unset or NETWORKING_AMBIENT_AI_ENABLED off).
+// Keyword -> emoji, checked in order; no match returns undefined on purpose - most messages should
+// get no reaction at all, the same way a human doesn't react to every single line in a group chat.
+const ambientReactionKeywords: Array<{ pattern: RegExp; emoji: string }> = [
+  { pattern: /parab[ée]ns|consegui|contratad[oa]|passei n[ao]|me formei/i, emoji: "🎉" },
+  { pattern: /kk+|haha+|rs(rs)+|😂/i, emoji: "😂" },
+  { pattern: /\?|d[úu]vida|n[ãa]o entendi/i, emoji: "🤔" },
+  { pattern: /bug|erro|quebrou|deu ruim|travou|caiu em prod/i, emoji: "😅" },
+  { pattern: /topzera|mandou bem|ficou (muito )?bom|show de bola/i, emoji: "👏" },
+  { pattern: /caf[ée]/i, emoji: "☕" },
+  { pattern: /amei|adorei|lindo|maravilh/i, emoji: "❤️" },
+  { pattern: /concordo|exatamente|isso mesmo|apoiad[oa]/i, emoji: "👍" }
+];
+
+export function pickAmbientReaction(messageText: string): string | undefined {
+  return ambientReactionKeywords.find(({ pattern }) => pattern.test(messageText))?.emoji;
+}
+
+// Non-AI fallback for ambient replies - generic enough to read as a natural nod to whatever was
+// just said, since there is no context-aware generation without Groq.
+const ambientReplyTemplates: Array<() => string> = [
+  () => "Boa, curti essa ideia.",
+  () => "Verdade, bate bastante com isso.",
+  () => "Marcou ponto aí.",
+  () => "Também acho.",
+  () => "Interessante, nunca tinha pensado por esse lado.",
+  () => "Apoiado."
+];
+
+export function pickAmbientReply(): string {
+  return pickOne(ambientReplyTemplates)();
+}
+
 
 function pickOne<T>(items: readonly T[]): T {
   const index = Math.floor(Math.random() * items.length);

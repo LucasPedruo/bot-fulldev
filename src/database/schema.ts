@@ -96,7 +96,9 @@ export const groupActivity = pgTable("group_activity", {
   lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
   mentionMuteUntil: timestamp("mention_mute_until", { withTimezone: true }),
   messagesToday: integer("messages_today").notNull().default(0),
-  messagesTodayDate: date("messages_today_date")
+  messagesTodayDate: date("messages_today_date"),
+  ambientReplyMuteUntil: timestamp("ambient_reply_mute_until", { withTimezone: true }),
+  lastAmbientReactionAt: timestamp("last_ambient_reaction_at", { withTimezone: true })
 });
 
 export const groupMembershipAction = pgEnum("group_membership_action", ["add", "remove"]);
@@ -135,6 +137,16 @@ export const mentionReplyLog = pgTable(
     repliedAt: timestamp("replied_at", { withTimezone: true }).notNull().defaultNow()
   },
   (table) => [index("mention_reply_log_group_replied_idx").on(table.groupJid, table.repliedAt)]
+);
+
+export const ambientReplyLog = pgTable(
+  "ambient_reply_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    groupJid: text("group_jid").notNull(),
+    repliedAt: timestamp("replied_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [index("ambient_reply_log_group_replied_idx").on(table.groupJid, table.repliedAt)]
 );
 
 export const eventModality = pgEnum("event_modality", ["in_person", "online", "hybrid"]);
