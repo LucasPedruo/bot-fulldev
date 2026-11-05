@@ -1,6 +1,5 @@
 import type { BaileysEventMap } from "@whiskeysockets/baileys";
 import { logger } from "../shared/logger.js";
-import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
 import { joinRequestService, type JoinRequestService } from "./join-request.service.js";
 
 export type GroupJoinRequestUpdate = BaileysEventMap["group.join-request"];
@@ -19,8 +18,8 @@ export function createJoinRequestListener(
   const service = options.service ?? joinRequestService;
 
   return async function handleGroupJoinRequest(update: GroupJoinRequestUpdate): Promise<void> {
-    const networkingGroups = options.networkingGroups ?? getConfiguredWhatsAppGroups().networkingGroups;
-    if (!networkingGroups.includes(update.id)) {
+    // Without an explicit test/override list, handle every group. WhatsApp enforces admin access.
+    if (options.networkingGroups && !options.networkingGroups.includes(update.id)) {
       return;
     }
 

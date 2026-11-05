@@ -370,3 +370,10 @@ void test("retries only the rejected ones, keeping the accepted approvals", asyn
   assert.deepEqual(result.approved.sort(), [retryPhone, okPhone].sort());
   assert.deepEqual(socket.approvals[1].participants, [retryPhone]);
 });
+
+void test("lets WhatsApp decide capacity above the classic local ceiling", async () => {
+  const socket = new FakeSocket([{ jid: "5511987654321@s.whatsapp.net" }], 1500);
+  const result = await buildService(socket, new FakeQueue(), { groupCapacity: undefined }).processGroup(groupJid);
+  assert.deepEqual(result.approved, ["5511987654321@s.whatsapp.net"]);
+  assert.deepEqual(result.skippedNoCapacity, []);
+});

@@ -27,7 +27,6 @@ import { createNetworkingMessageListener } from "./networking/message-listener.j
 import { queueWorker } from "./queue/queue.worker.js";
 import { releaseAnnouncerService } from "./release/release-announcer.service.js";
 import { eventCleanupScheduler } from "./scheduler/event-cleanup.scheduler.js";
-import { eventPromoScheduler } from "./scheduler/event-promo.scheduler.js";
 import { eventRemindersScheduler } from "./scheduler/event-reminders.scheduler.js";
 import { eventsScheduler } from "./scheduler/events.scheduler.js";
 import { jobsScheduler } from "./scheduler/jobs.scheduler.js";
@@ -163,7 +162,6 @@ async function start(): Promise<void> {
     if (env.EVENTS_POLL_ENABLED) {
       eventsScheduler.start();
       eventRemindersScheduler.start();
-      eventPromoScheduler.start();
       eventCleanupScheduler.start();
     } else {
       logger.info("Events scheduler disabled");
@@ -200,7 +198,6 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   joinRequestsScheduler.stop();
   eventsScheduler.stop();
   eventRemindersScheduler.stop();
-  eventPromoScheduler.stop();
   eventCleanupScheduler.stop();
   queueWorker.stop();
   whatsapp.stop();

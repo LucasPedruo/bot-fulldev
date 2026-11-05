@@ -1,4 +1,4 @@
-import { env } from "../config/env.js";
+import { jidNormalizedUser } from "@whiskeysockets/baileys";
 import type { queueService } from "../queue/queue.service.js";
 import type { QueueMessage } from "../queue/queue.types.js";
 import { logger } from "../shared/logger.js";
@@ -6,8 +6,6 @@ import { resolvePhoneJid } from "../shared/mentions.js";
 import { moderationRepository, type ModerationRepository } from "../moderation/moderation.repository.js";
 import { isLikelyRealPhoneNumber } from "../shared/phone.js";
 import { whatsapp } from "../whatsapp/client.js";
-import { getGroupCapacity } from "../whatsapp/capacity.js";
-import { getConfiguredWhatsAppGroups } from "../whatsapp/groups.js";
 
 // Approving a join request needs the bot to be an admin of the group - WhatsApp rejects the
 // membership_requests_action query otherwise. That failure surfaces as a thrown query error, which
@@ -28,8 +26,7 @@ export type QueueServiceLike = {
 
 export type JoinRequestServiceOptions = {
   networkingGroups?: string[];
-  /** Member ceiling for a group. Defaults to the per-group configuration, because real groups
-   * disagree with the classic 1024 limit. */
+  /** Optional local ceiling. By default WhatsApp decides whether the group has room. */
   groupCapacity?: number | ((groupJid: string) => number);
   queue?: QueueServiceLike;
   getSocket?: () => JoinRequestSocketLike | undefined;
@@ -48,7 +45,7 @@ export type ProcessGroupResult = {
   skippedSuspicious: string[];
   /** Requests refused because the person is serving a moderation block on this group. */
   skippedBlocked: string[];
-  /** Requests left pending purely because the group has no free slot. */
+  /** Requests left pending because an explicit local ceiling has no free slot. */
   skippedNoCapacity: string[];
 };
 
@@ -56,7 +53,7 @@ export class JoinRequestService {
   constructor(private readonly options: JoinRequestServiceOptions = {}) {}
 
   async processAllGroups(): Promise<ProcessGroupResult[]> {
-    const groups = this.options.networkingGroups ?? getAutoApproveGroups();
+    const groups = this.options.networkingGroups ?? await getAutoApproveGroups();
     const results: ProcessGroupResult[] = [];
 
     for (const groupJid of groups) {
@@ -104,10 +101,13 @@ export class JoinRequestService {
 
     result.pending = requests.length;
 
-    const configured = this.options.groupCapacity;
-    const capacity =
-      typeof configured === "function" ? configured(groupJid) : (configured ?? getGroupCapacity(groupJid));
     const metadata = await socket.groupMetadata(groupJid);
+    const configured = this.options.groupCapacity;
+    // Community groups can exceed 1024 members. An old guessed ceiling must not prevent
+    // even attempting approval: the WhatsApp server enforces the actual membership limit.
+    const capacity = typeof configured === "function"
+      ? configured(groupJid)
+      : (configured ?? metadata.participants.length + requests.length);
     const freeSlots = Math.max(0, capacity - metadata.participants.length);
 
     const resolveJid = this.options.resolveJid ?? ((jid: string) => defaultResolveJid(jid));
@@ -213,17 +213,42 @@ async function defaultResolveJid(jid: string): Promise<string> {
 
 export const joinRequestService = new JoinRequestService();
 
-// Networking always, jobs groups only when explicitly enabled. The jobs groups fill up the same
-// way and had pending requests piling up, but approving into them is a separate decision from
-// approving into networking, so it stays behind its own flag.
-//
-// The faculty jobs group is deliberately left out: it belongs to the college, not to FullDev, the
-// bot is not an admin there, and who gets into it is not ours to decide.
-export function getAutoApproveGroups(): string[] {
-  const groups = getConfiguredWhatsAppGroups();
-  const jobsGroups = env.JOBS_AUTO_APPROVE_ENABLED ? [groups.jobsGroup1, groups.jobsGroup2] : [];
+export type AutoApproveDiscoverySocket = {
+  user?: { id?: string; lid?: string };
+  groupFetchAllParticipating(): Promise<Record<string, {
+    id: string;
+    participants: Array<{ id: string; phoneNumber?: string; lid?: string; admin?: string | null }>;
+  }>>;
+};
 
-  return [...new Set([...groups.networkingGroups, ...jobsGroups])].filter((jid) => jid.length > 0);
+// Discover groups from WhatsApp so newly joined groups do not need a configuration change.
+// Membership alone is insufficient: only groups where this account is an admin are eligible.
+export async function getAutoApproveGroups(
+  socket: AutoApproveDiscoverySocket | undefined =
+    whatsapp.getStatus() === "connected" ? whatsapp.getSocket() : undefined
+): Promise<string[]> {
+  if (!socket) {
+    return [];
+  }
+
+  const botJids = new Set(
+    [socket.user?.id, socket.user?.lid]
+      .filter((jid): jid is string => Boolean(jid))
+      .map(jidNormalizedUser)
+  );
+  if (botJids.size === 0) {
+    return [];
+  }
+
+  const groups = await socket.groupFetchAllParticipating();
+  return [...new Set(Object.values(groups)
+    .filter((group) => group.participants.some((participant) =>
+      (participant.admin === "admin" || participant.admin === "superadmin") &&
+      [participant.id, participant.phoneNumber, participant.lid].some(
+        (jid) => Boolean(jid && botJids.has(jidNormalizedUser(jid)))
+      )
+    ))
+    .map((group) => group.id))];
 }
 
 type ApprovalCandidate = { requestJid: string; phoneJid: string };
