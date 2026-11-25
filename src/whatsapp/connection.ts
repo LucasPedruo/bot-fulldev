@@ -20,10 +20,6 @@ import { resolvePhoneJids } from "../shared/mentions.js";
 
 export type WhatsAppConnectionStatus = "not_configured" | "connecting" | "qr_pending" | "connected" | "disconnected" | "logged_out";
 
-// WhatsApp pairing codes stay valid for about a minute - long enough for a human to read and type
-// one in, but shorter than that and the reconnect below would keep replacing it first.
-const PAIRING_CODE_RECONNECT_DELAY_MS = 150_000;
-
 export type WhatsAppGroup = {
   jid: string;
   name: string;
@@ -120,6 +116,7 @@ export class WhatsAppConnectionManager {
       if (connection === "open") {
         this.status = "connected";
         this.reconnectAttempts = 0;
+        this.pendingPairingCode = false;
         this.log.info({ user: this.socket?.user?.id }, "WhatsApp connected");
       }
 
@@ -141,15 +138,15 @@ export class WhatsAppConnectionManager {
             { statusCode },
             "WhatsApp session logged out - re-pairing required (scan a new QR code or set WHATSAPP_PAIRING_PHONE_NUMBER and restart)"
           );
+        } else if (this.pendingPairingCode) {
+          // The socket always closes right after a pairing code is issued (that's just how the
+          // pairing handshake works). Auto-reconnecting here would request, and so invalidate, a
+          // fresh code before a human has any real chance to type the current one in - so don't:
+          // leave this one standing until it's used or the process is restarted for another.
+          this.log.warn({ statusCode }, "WhatsApp disconnected after issuing a pairing code - not auto-reconnecting");
         } else {
           this.log.warn({ statusCode }, "WhatsApp disconnected, reconnecting");
-          // The socket always closes right after a pairing code is issued (that's just how the
-          // pairing handshake works) - reconnecting on the usual fast backoff would request, and so
-          // invalidate, a fresh code before a human has any real chance to type the current one in.
-          // Give it the code's actual validity window instead, once.
-          const delayMs = this.pendingPairingCode ? PAIRING_CODE_RECONNECT_DELAY_MS : undefined;
-          this.pendingPairingCode = false;
-          this.scheduleReconnect(delayMs);
+          this.scheduleReconnect();
         }
       }
     });
@@ -245,12 +242,12 @@ export class WhatsAppConnectionManager {
     return this.socket;
   }
 
-  private scheduleReconnect(overrideDelayMs?: number): void {
+  private scheduleReconnect(): void {
     if (this.reconnectTimer) {
       return;
     }
 
-    const delayMs = overrideDelayMs ?? Math.min(60_000, 5_000 * 2 ** this.reconnectAttempts);
+    const delayMs = Math.min(60_000, 5_000 * 2 ** this.reconnectAttempts);
     this.reconnectAttempts += 1;
     this.log.info({ delayMs }, "Scheduling WhatsApp reconnect");
 
