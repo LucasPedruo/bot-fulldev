@@ -20,6 +20,10 @@ import { resolvePhoneJids } from "../shared/mentions.js";
 
 export type WhatsAppConnectionStatus = "not_configured" | "connecting" | "qr_pending" | "connected" | "disconnected" | "logged_out";
 
+// WhatsApp pairing codes stay valid for about a minute - long enough for a human to read and type
+// one in, but shorter than that and the reconnect below would keep replacing it first.
+const PAIRING_CODE_RECONNECT_DELAY_MS = 50_000;
+
 export type WhatsAppGroup = {
   jid: string;
   name: string;
@@ -32,6 +36,7 @@ export class WhatsAppConnectionManager {
   private status: WhatsAppConnectionStatus = "not_configured";
   private reconnectTimer?: NodeJS.Timeout;
   private reconnectAttempts = 0;
+  private pendingPairingCode = false;
   private stopping = false;
   private messageHandler?: (message: WAMessage) => void | Promise<void>;
   private groupParticipantsHandler?: (update: BaileysEventMap["group-participants.update"]) => void | Promise<void>;
@@ -138,7 +143,13 @@ export class WhatsAppConnectionManager {
           );
         } else {
           this.log.warn({ statusCode }, "WhatsApp disconnected, reconnecting");
-          this.scheduleReconnect();
+          // The socket always closes right after a pairing code is issued (that's just how the
+          // pairing handshake works) - reconnecting on the usual fast backoff would request, and so
+          // invalidate, a fresh code before a human has any real chance to type the current one in.
+          // Give it the code's actual validity window instead, once.
+          const delayMs = this.pendingPairingCode ? PAIRING_CODE_RECONNECT_DELAY_MS : undefined;
+          this.pendingPairingCode = false;
+          this.scheduleReconnect(delayMs);
         }
       }
     });
@@ -148,6 +159,7 @@ export class WhatsAppConnectionManager {
       // makeWASocket() returns - calling it immediately fails with "Connection Closed" (428).
       await waitForSocketOpen(this.socket);
       const code = await this.socket.requestPairingCode(env.WHATSAPP_PAIRING_PHONE_NUMBER);
+      this.pendingPairingCode = true;
       this.log.info({ pairingCode: code }, "WhatsApp pairing code generated");
     }
   }
@@ -233,12 +245,12 @@ export class WhatsAppConnectionManager {
     return this.socket;
   }
 
-  private scheduleReconnect(): void {
+  private scheduleReconnect(overrideDelayMs?: number): void {
     if (this.reconnectTimer) {
       return;
     }
 
-    const delayMs = Math.min(60_000, 5_000 * 2 ** this.reconnectAttempts);
+    const delayMs = overrideDelayMs ?? Math.min(60_000, 5_000 * 2 ** this.reconnectAttempts);
     this.reconnectAttempts += 1;
     this.log.info({ delayMs }, "Scheduling WhatsApp reconnect");
 
