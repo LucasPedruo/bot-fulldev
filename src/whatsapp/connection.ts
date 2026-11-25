@@ -144,6 +144,9 @@ export class WhatsAppConnectionManager {
     });
 
     if (!state.creds.registered && env.WHATSAPP_PAIRING_PHONE_NUMBER) {
+      // requestPairingCode sends a node over the raw websocket, which isn't open yet right after
+      // makeWASocket() returns - calling it immediately fails with "Connection Closed" (428).
+      await waitForSocketOpen(this.socket);
       const code = await this.socket.requestPairingCode(env.WHATSAPP_PAIRING_PHONE_NUMBER);
       this.log.info({ pairingCode: code }, "WhatsApp pairing code generated");
     }
@@ -256,4 +259,14 @@ function getDisconnectStatusCode(error: unknown): number | undefined {
   }
 
   return undefined;
+}
+
+function waitForSocketOpen(socket: WASocket): Promise<void> {
+  if (socket.ws.isOpen) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    socket.ws.once("open", () => resolve());
+  });
 }
