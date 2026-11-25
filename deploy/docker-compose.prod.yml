@@ -1,0 +1,12 @@
+services:
+  app:
+    # Lets the VPS's shared Caddy instance reach this service by container name to proxy
+    # GET /public/status to the community site, the same way it already reaches store-app.
+    # Only applied in production (see README's "Deploy" section) - local dev has no "web" network.
+    networks:
+      - default
+      - web
+
+networks:
+  web:
+    external: true

@@ -734,6 +734,18 @@ Pra agendar automaticamente (uma vez que o bot estiver numa VPS), adicionar no c
 
 Deliberadamente **manual** — nao ha webhook nem CI disparando isso sozinho. Testado de ponta a ponta contra os containers reais.
 
+### Rede compartilhada com o site (producao)
+
+`GET /public/status` alimenta o widget de status do bot em fulldev.com.br, que chega ate o container via o Caddy compartilhado do VPS (o mesmo que roteia `store-app`). Isso exige que o container `app` esteja na rede externa `web`, o que **so deve acontecer em producao** — localmente nao existe (nem precisa existir) essa rede.
+
+Por isso o `docker-compose.yml` da raiz fica limpo para dev local, e `deploy/docker-compose.prod.yml` adiciona a rede `web` por cima dele. No servidor, isso e aplicado automaticamente definindo no `.env` da raiz (arquivo so do servidor, nao versionado):
+
+```
+COMPOSE_FILE=docker-compose.yml:deploy/docker-compose.prod.yml
+```
+
+Com isso, `docker compose build/up` (inclusive dentro de `scripts/deploy.sh`) ja mescla os dois arquivos sem precisar de `-f` em todo comando.
+
 ## Proxima fase
 
 Todos os itens do roadmap original (vagas, mencoes/entrada-saida, networking programado, estatisticas, eventos) estao implementados - memes e a feature de ociosidade (posts automaticos por tempo de silencio) foram removidos por escolha do usuario. Robustez de producao: backup/recuperacao dos volumes, deploy com healthcheck e alerta melhorado de sessao deslogada ja feitos (secoes acima). Protecao de endpoints administrativos e moot por enquanto (hoje so existem `/health` e `/ready`, sem autenticacao — so vira relevante quando algum endpoint de controle for adicionado). **VPS em producao desde 2026-09-07** (HostGator, `/opt/bot-fulldev`) - a execucao ja nao depende mais da maquina local do usuario.

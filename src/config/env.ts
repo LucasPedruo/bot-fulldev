@@ -159,7 +159,18 @@ const envSchema = z.object({
   NETWORKING_AMBIENT_REACTION_MIN_GAP_MINUTES: z.coerce.number().int().positive().default(5),
   NETWORKING_AMBIENT_REPLY_PROBABILITY: z.coerce.number().min(0).max(1).default(0.04),
   NETWORKING_AMBIENT_REPLY_MAX_PER_HOUR: z.coerce.number().int().positive().default(3),
-  NETWORKING_AMBIENT_REPLY_COOLDOWN_HOURS: z.coerce.number().int().positive().default(1)
+  NETWORKING_AMBIENT_REPLY_COOLDOWN_HOURS: z.coerce.number().int().positive().default(1),
+  // Origins allowed to call the read-only /public/status endpoint (comma-separated). Only needed
+  // because the site that renders this data lives on a different origin than the bot's API.
+  PUBLIC_STATUS_ALLOWED_ORIGINS: z
+    .string()
+    .default("https://fulldev.com.br,https://www.fulldev.com.br")
+    .transform((value) =>
+      value
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+    )
 });
 
 export type Env = z.infer<typeof envSchema>;
