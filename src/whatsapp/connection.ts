@@ -22,7 +22,7 @@ export type WhatsAppConnectionStatus = "not_configured" | "connecting" | "qr_pen
 
 // WhatsApp pairing codes stay valid for about a minute - long enough for a human to read and type
 // one in, but shorter than that and the reconnect below would keep replacing it first.
-const PAIRING_CODE_RECONNECT_DELAY_MS = 50_000;
+const PAIRING_CODE_RECONNECT_DELAY_MS = 150_000;
 
 export type WhatsAppGroup = {
   jid: string;
