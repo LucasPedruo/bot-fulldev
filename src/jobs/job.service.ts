@@ -92,9 +92,9 @@ export class JobService {
     const groups = getConfiguredWhatsAppGroups();
     // Every configured jobs group gets the exact same posting - the faculty group's copy just has
     // an extra line inviting people to check out the FullDev community. The faculty group only gets
-    // internship/junior postings (its members are just starting their careers); a job with no known
-    // level is skipped there too, since it can't be confirmed as entry-level.
-    const isFacultyEligible = job.level === "intern" || job.level === "junior";
+    // intern/junior/mid postings (no senior roles there); a job with no known level is skipped too,
+    // since it can't be confirmed as within that range.
+    const isFacultyEligible = job.level === "intern" || job.level === "junior" || job.level === "mid";
     const destinations = [
       { group: groups.jobsGroup1, text: formatJobMessage(job) },
       { group: groups.jobsGroup2, text: formatJobMessage(job) },
